@@ -53,27 +53,6 @@ const config = {
   },
 };
 
-// Game state
-const gameState = {
-  started: false,
-  finished: false,
-  speed: 0, // Current speed
-  targetSpeed: 0, // Target speed based on physics
-  acceleration: 0, // Current acceleration
-  maxSpeed: 0, // Maximum speed reached
-  checkpoint: 0,
-  startTime: null,
-  endTime: null,
-  currentTime: 0,
-  currentGear: 0, // Current gear (0 = neutral)
-  targetGear: 0, // Target gear when changing
-  gearChangeStart: 0, // When gear change started
-  isChangingGear: false, // Whether currently changing gear
-  rpm: 0, // Engine RPM (0-100%)
-  wheelspin: 0, // Amount of wheelspin (0-1)
-  steering: 0, // Current steering angle
-};
-
 // Input state
 // let keysPressed = {
 //   ArrowUp: false,
@@ -97,3 +76,11 @@ let touchControls = {
 //   playerCar,
 //   aiCars = [],
 //   track;
+
+// Any configuration functions can now use the global gameState
+function initializeGameConfig() {
+  // You can still set specific config values here if needed
+  gameState.finishDistance = 1000; // meters to finish line
+
+  // Other configuration...
+}

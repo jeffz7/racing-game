@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Racing Game Lobby</title>
+    <link rel="stylesheet" href="css/lobby.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Racing Game</h1>
+
+      <!-- Step 1: Game Mode Selection -->
+      <div id="mode-selection" class="step-container active">
+        <h2>Select Game Mode</h2>
+        <div class="mode-buttons">
+          <button id="btn-create-game" class="mode-button">
+            <div class="icon">🏁</div>
+            <div class="label">Create Game</div>
+            <div class="description">Host a new multiplayer race</div>
+          </button>
+
+          <button id="btn-join-game" class="mode-button">
+            <div class="icon">🏎️</div>
+            <div class="label">Join Game</div>
+            <div class="description">Join an existing multiplayer race</div>
+          </button>
+
+          <button id="btn-single-player" class="mode-button">
+            <div class="icon">🚗</div>
+            <div class="label">Single Player</div>
+            <div class="description">Race against AI opponents</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Create Game Form -->
+      <div id="create-game-form" class="step-container">
+        <h2>Create New Game</h2>
+        <div class="form-container">
+          <div class="form-group">
+            <label for="create-player-name">Your Name:</label>
+            <input
+              type="text"
+              id="create-player-name"
+              placeholder="Enter your name"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="create-server-url">Server URL:</label>
+            <input
+              type="text"
+              id="create-server-url"
+              placeholder="Enter server URL"
+              value="http://localhost:3000"
+            />
+          </div>
+
+          <div class="buttons">
+            <button id="btn-back-from-create" class="back-button">Back</button>
+            <button id="btn-create-confirm" class="confirm-button">
+              Create Game
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Join Game Form -->
+      <div id="join-game-form" class="step-container">
+        <h2>Join Existing Game</h2>
+        <div class="form-container">
+          <div class="form-group">
+            <label for="join-player-name">Your Name:</label>
+            <input
+              type="text"
+              id="join-player-name"
+              placeholder="Enter your name"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="join-server-url">Server URL:</label>
+            <input
+              type="text"
+              id="join-server-url"
+              placeholder="Enter server URL"
+              value="http://localhost:3000"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="join-game-id">Game ID:</label>
+            <input
+              type="text"
+              id="join-game-id"
+              placeholder="Enter game ID to join"
+            />
+          </div>
+
+          <div class="buttons">
+            <button id="btn-back-from-join" class="back-button">Back</button>
+            <button id="btn-join-confirm" class="confirm-button">
+              Join Game
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Single Player Form -->
+      <div id="single-player-form" class="step-container">
+        <h2>Single Player Mode</h2>
+        <div class="form-container">
+          <div class="form-group">
+            <label for="single-player-name">Your Name:</label>
+            <input
+              type="text"
+              id="single-player-name"
+              placeholder="Enter your name"
+            />
+          </div>
+
+          <div class="buttons">
+            <button id="btn-back-from-single" class="back-button">Back</button>
+            <button id="btn-single-confirm" class="confirm-button">
+              Start Race
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <script src="js/lobby.js"></script>
+  </body>
+</html>

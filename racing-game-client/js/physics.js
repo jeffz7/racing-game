@@ -77,3 +77,248 @@ function checkFinish(car, name) {
     }
   }
 }
+
+// Car physics and movement
+
+// Update player car
+function updatePlayerCar(deltaTime) {
+  if (!playerCar) return;
+
+  // Get controls from gameState
+  const { accelerate, brake, turnLeft, turnRight, shiftUp, shiftDown } =
+    gameState.controls;
+
+  // Handle acceleration
+  if (accelerate) {
+    // Apply throttle
+    applyThrottle(1.0);
+  } else {
+    applyThrottle(0);
+  }
+
+  // Handle braking
+  if (brake) {
+    applyBrakes(1.0);
+  } else {
+    applyBrakes(0);
+  }
+
+  // Handle steering
+  let steeringInput = 0;
+  if (turnLeft) steeringInput -= 1;
+  if (turnRight) steeringInput += 1;
+  applySteering(steeringInput);
+
+  // Handle gear shifting
+  if (shiftUp && !gameState.isChangingGear) {
+    shiftGearUp();
+  }
+  if (shiftDown && !gameState.isChangingGear) {
+    shiftGearDown();
+  }
+
+  // Update physics
+  updateCarPhysics(deltaTime);
+
+  // Update car position based on speed and direction
+  const moveDistance = gameState.speed * deltaTime;
+  playerCar.position.z -= Math.cos(playerCar.rotation.y) * moveDistance;
+  playerCar.position.x -= Math.sin(playerCar.rotation.y) * moveDistance;
+
+  // Update car wheels
+  if (typeof updateCarWheels === "function") {
+    updateCarWheels(playerCar, gameState.speed);
+  }
+
+  // Update distance traveled
+  if (gameState.started && !gameState.finished) {
+    // Calculate distance based on forward movement
+    gameState.distance += moveDistance;
+
+    // Check for finish line
+    if (gameState.distance >= gameState.finishDistance && !gameState.finished) {
+      finishRace();
+    }
+  }
+
+  // Debug output
+  if (gameState.speed > 0.1 && Math.random() < 0.05) {
+    console.log(
+      `Car position: x=${playerCar.position.x.toFixed(
+        2
+      )}, z=${playerCar.position.z.toFixed(
+        2
+      )}, rotation=${playerCar.rotation.y.toFixed(
+        2
+      )}, speed=${gameState.speed.toFixed(2)}`
+    );
+  }
+}
+
+// Update car physics
+function updateCarPhysics(deltaTime) {
+  // Calculate engine force based on throttle and current gear
+  const engineForce = gameState.throttle * getEngineForce();
+
+  // Calculate drag force (air resistance)
+  const dragForce = gameState.speed * gameState.speed * 0.0001;
+
+  // Calculate rolling resistance
+  const rollingResistance = gameState.speed * 0.01;
+
+  // Calculate braking force
+  const brakeForce = gameState.brakeForce * 2.0;
+
+  // Calculate net force
+  const netForce = engineForce - dragForce - rollingResistance - brakeForce;
+
+  // Calculate acceleration (F = ma)
+  gameState.acceleration = netForce / gameState.mass;
+
+  // Update speed based on acceleration and delta time
+  gameState.speed += gameState.acceleration * deltaTime * 60; // Scale by 60 to normalize for 60fps
+
+  // Ensure speed doesn't go negative when braking/decelerating
+  if (gameState.speed < 0) {
+    gameState.speed = 0;
+    gameState.acceleration = 0;
+  }
+
+  // Calculate RPM based on speed and gear
+  updateRPM();
+
+  // Debug output (less frequent to avoid console spam)
+  if (Math.random() < 0.05) {
+    console.log(
+      `Speed: ${gameState.speed.toFixed(
+        2
+      )}, Accel: ${gameState.acceleration.toFixed(
+        2
+      )}, RPM: ${gameState.rpm.toFixed(0)}, Gear: ${gameState.currentGear}`
+    );
+  }
+}
+
+// Apply throttle input (0.0 to 1.0)
+function applyThrottle(amount) {
+  gameState.throttle = amount;
+}
+
+// Apply brake input (0.0 to 1.0)
+function applyBrakes(amount) {
+  gameState.brakeForce = amount;
+}
+
+// Apply steering input (-1.0 to 1.0)
+function applySteering(amount) {
+  // Calculate steering angle based on input and speed
+  // Reduce steering angle at higher speeds for stability
+  const speedFactor = 1.0 - (gameState.speed / 200) * 0.5;
+  const steeringAngle = amount * gameState.maxSteeringAngle * speedFactor;
+
+  // Apply steering to car rotation
+  playerCar.rotation.y += steeringAngle * 0.05;
+}
+
+// Get engine force based on current RPM and gear
+function getEngineForce() {
+  // If in neutral, no engine force
+  if (gameState.currentGear === 0) {
+    return 0;
+  }
+
+  // Simple engine model
+  // Maximum power at around 70-80% of max RPM
+  const normalizedRPM = gameState.rpm / gameState.maxRPM;
+  let powerFactor = 4.0 * normalizedRPM * (1.0 - normalizedRPM);
+
+  // Apply gear ratio
+  const gearRatio = gameState.gearRatios[gameState.currentGear + 1]; // +1 because -1 is reverse
+
+  // Calculate engine force
+  let force = powerFactor * gameState.maxEnginePower * gearRatio;
+
+  // Handle reverse gear
+  if (gameState.currentGear === -1) {
+    force = -force; // Negative force for reverse
+  }
+
+  return force;
+}
+
+// Update RPM based on speed and current gear
+function updateRPM() {
+  if (gameState.currentGear === -1) {
+    // Reverse gear
+    gameState.rpm = gameState.speed * 100;
+  } else if (gameState.currentGear === 0) {
+    // Neutral gear
+    gameState.rpm = Math.max(gameState.idleRPM, gameState.rpm - 50);
+  } else {
+    // Forward gears
+    const gearRatio = gameState.gearRatios[gameState.currentGear + 1]; // +1 because -1 is reverse
+    gameState.rpm = gameState.speed * 100 * (1.0 / gearRatio);
+  }
+
+  // Limit RPM to max
+  if (gameState.rpm > gameState.maxRPM) {
+    gameState.rpm = gameState.maxRPM;
+  }
+
+  // Idle RPM when stopped
+  if (gameState.speed < 0.1) {
+    gameState.rpm = gameState.idleRPM;
+  }
+}
+
+// Shift up a gear
+function shiftGearUp() {
+  if (gameState.isChangingGear) return;
+
+  if (gameState.currentGear < gameState.gearRatios.length - 2) {
+    // -2 because of reverse gear
+    gameState.isChangingGear = true;
+    gameState.gearChangeStart = Date.now();
+
+    // Shift up after a delay
+    setTimeout(() => {
+      gameState.currentGear++;
+      gameState.isChangingGear = false;
+
+      // Play gear shift sound
+      if (gameState.sounds && gameState.sounds.gearShift) {
+        gameState.sounds.gearShift.play();
+      }
+
+      console.log(`Shifted up to gear ${gameState.currentGear}`);
+    }, 200);
+  }
+}
+
+// Shift down a gear
+function shiftGearDown() {
+  if (gameState.isChangingGear) return;
+
+  if (gameState.currentGear > -1) {
+    gameState.isChangingGear = true;
+    gameState.gearChangeStart = Date.now();
+
+    // Shift down after a delay
+    setTimeout(() => {
+      gameState.currentGear--;
+      gameState.isChangingGear = false;
+
+      // Play gear shift sound
+      if (gameState.sounds && gameState.sounds.gearShift) {
+        gameState.sounds.gearShift.play();
+      }
+
+      console.log(`Shifted down to gear ${gameState.currentGear}`);
+    }, 200);
+  }
+}
+
+// Export functions
+window.updatePlayerCar = updatePlayerCar;
+window.shiftGearUp = shiftGearUp;
+window.shiftGearDown = shiftGearDown;

@@ -1,164 +1,42 @@
 // Update AI cars
 function updateAICars() {
-  if (!gameState.started) return;
+  if (!window.aiCars || !Array.isArray(window.aiCars)) return;
 
-  // Update each AI car
-  aiCars.forEach((car, index) => {
-    // Get AI car state from userData
-    if (!car.userData.aiState) {
-      // Initialize AI state if not exists
-      car.userData.aiState = {
-        speed: 0,
-        maxSpeed: 0,
-        acceleration: 0,
-        currentGear: 0,
-        targetGear: 0,
-        isChangingGear: false,
-        gearChangeStart: 0,
-        rpm: 0,
-        wheelspin: 0,
-        lastGearChangeTime: 0,
-      };
-    }
+  window.aiCars.forEach((aiCar) => {
+    if (!aiCar.userData || !aiCar.userData.aiState) return;
 
-    const aiState = car.userData.aiState;
+    const aiState = aiCar.userData.aiState;
 
-    // Previous values for comparison
-    const previousSpeed = aiState.speed;
-    const previousGear = aiState.currentGear;
+    // Simple AI logic - accelerate and occasionally change gears
+    const targetSpeed = 60 + Math.random() * 40; // Random target speed between 60-100
 
-    // Get physics constants (same as player)
-    const maxSpeed = config.carSpeed * (0.9 + index * 0.05); // Slight variation between AI cars
-    const baseAcceleration = config.acceleration * (0.85 + index * 0.05); // Slight variation
-    const deceleration = config.deceleration;
-    const brakeForce = config.brakeForce;
-    const inertia = config.physics.inertia;
-    const grip = config.physics.grip;
-
-    // AI decision making - determine if accelerating, braking, or steering
-    const isAccelerating = Math.random() < 0.95; // 95% chance to accelerate
-    const isBraking = Math.random() < 0.05; // 5% chance to brake
-
-    // Random steering with some persistence
-    let steeringDirection = car.userData.steeringDirection || 0;
-    if (Math.random() < 0.02) {
-      // 2% chance to change steering direction
-      steeringDirection = Math.random() - 0.5;
-      car.userData.steeringDirection = steeringDirection;
-    }
-
-    // Handle AI gear changes
-    updateAIGearChanges(car, aiState);
-
-    // Calculate effective acceleration based on current gear
-    let effectiveAcceleration = 0;
-
-    // Get gear efficiency and speed limit
-    const gearEfficiency =
-      config.physics.gearEfficiency[aiState.currentGear] || 1;
-    const gearSpeedLimit =
-      (config.physics.speedLimits[aiState.currentGear] || 1) * maxSpeed;
-
-    // Calculate acceleration based on gear and throttle
-    if (isAccelerating && !aiState.isChangingGear) {
-      // Base acceleration modified by gear efficiency
-      effectiveAcceleration = baseAcceleration * gearEfficiency;
-
-      // Reduce acceleration as we approach gear's speed limit
-      const speedRatio = Math.abs(aiState.speed) / gearSpeedLimit;
-      if (speedRatio > 0.8) {
-        // Exponential dropoff in acceleration as we approach gear limit
-        effectiveAcceleration *= Math.pow(1 - (speedRatio - 0.8) / 0.2, 2);
-      }
-
-      // Add some wheelspin effect at low speeds with high acceleration
-      if (aiState.speed < 0.1 && aiState.currentGear > 0) {
-        aiState.wheelspin = Math.min(aiState.wheelspin + 0.05, 1);
-
-        // Reduce effective acceleration during wheelspin
-        effectiveAcceleration *= 1 - aiState.wheelspin * 0.7;
-      } else {
-        // Gradually reduce wheelspin
-        aiState.wheelspin = Math.max(aiState.wheelspin - 0.1, 0);
-      }
+    // Accelerate toward target speed
+    if (aiState.speed < targetSpeed) {
+      aiState.acceleration = 2 + Math.random() * 1; // Random acceleration between 2-3
     } else {
-      // Gradually reduce wheelspin when not accelerating
-      aiState.wheelspin = Math.max(aiState.wheelspin - 0.1, 0);
+      aiState.acceleration = -1 - Math.random() * 1; // Random deceleration between -1 to -2
     }
 
-    // Apply braking force
-    if (isBraking) {
-      // Stronger braking at higher speeds
-      const brakingForce =
-        brakeForce * (0.5 + (Math.abs(aiState.speed) / maxSpeed) * 0.5);
+    // Update speed based on acceleration
+    aiState.speed += aiState.acceleration * 0.1;
 
-      if (aiState.speed > 0.01) {
-        // Braking when moving forward
-        effectiveAcceleration -= brakingForce;
-      } else if (aiState.speed < -0.01) {
-        // Braking when moving backward
-        effectiveAcceleration += brakingForce;
-      }
-    }
-
-    // Apply natural deceleration (engine braking, friction)
-    if (!isAccelerating && !isBraking) {
-      // More engine braking in lower gears
-      const engineBraking =
-        deceleration * (1 + (5 - aiState.currentGear) * 0.1);
-
-      if (aiState.speed > 0.01) {
-        effectiveAcceleration -= engineBraking;
-      } else if (aiState.speed < -0.01) {
-        effectiveAcceleration += engineBraking;
-      }
-    }
-
-    // Update acceleration
-    aiState.acceleration = effectiveAcceleration;
-
-    // Apply acceleration to speed with inertia
-    const targetSpeed = aiState.speed + aiState.acceleration;
-
-    // Apply inertia - car doesn't instantly reach target speed
-    aiState.speed = aiState.speed * inertia + targetSpeed * (1 - inertia);
-
-    // Enforce gear speed limits
-    if (Math.abs(aiState.speed) > gearSpeedLimit) {
-      // Gradually reduce speed if over the gear's limit
-      aiState.speed =
-        aiState.speed > 0
-          ? Math.max(aiState.speed * 0.98, gearSpeedLimit)
-          : Math.min(aiState.speed * 0.98, -gearSpeedLimit);
-    }
-
-    // Handle steering with realistic physics
-    updateAISteering(car, steeringDirection, grip, aiState.speed, maxSpeed);
-
-    // Calculate current gear and RPM
-    updateAIGearAndRPM(car, aiState, maxSpeed);
-
-    // Update exhaust particles if the function exists
-    if (typeof updateExhaustParticles === "function") {
-      updateExhaustParticles(car, isAccelerating, aiState.rpm);
-    }
-
-    // Move car based on current speed
-    car.translateZ(aiState.speed);
+    // Ensure speed stays positive
+    aiState.speed = Math.max(0, aiState.speed);
 
     // Update max speed
     if (aiState.speed > aiState.maxSpeed) {
       aiState.maxSpeed = aiState.speed;
     }
 
-    // Check for collisions with other cars
-    checkAICollisions(car, index);
+    // Move car forward
+    aiCar.position.z -= Math.cos(aiCar.rotation.y) * (aiState.speed * 0.01);
+    aiCar.position.x -= Math.sin(aiCar.rotation.y) * (aiState.speed * 0.01);
 
-    // Check if AI car has finished
-    checkFinish(car, car.userData.name || `AI Car ${index + 1}`);
+    // Update distance traveled
+    aiState.distance += aiState.speed * 0.01;
 
-    // Check track boundaries
-    checkAIBoundaries(car);
+    // Store distance for leaderboard
+    aiCar.distance = aiState.distance;
   });
 }
 
@@ -318,51 +196,49 @@ function checkAIBoundaries(car) {
   }
 }
 
-// Initialize AI cars with different colors
+// Initialize AI cars
 function initAICars() {
-  // Clear existing AI cars array
-  window.aiCars = [];
+  console.log("Initializing AI cars for single player mode");
 
-  // Get a reference to the global aiCars array
-  const aiCars = window.aiCars;
+  // Clear existing AI cars first
+  if (window.aiCars && window.aiCars.length > 0) {
+    console.log(`Removing ${window.aiCars.length} existing AI cars`);
+    window.aiCars.forEach((car) => {
+      scene.remove(car);
+    });
+    window.aiCars = [];
+  } else {
+    window.aiCars = [];
+  }
 
-  // Different colors for each AI car
+  // AI car configuration
+  const config = {
+    aiCars: 4, // Number of AI cars
+  };
+
+  // AI car colors and names
   const aiColors = [
     0xff0000, // Red
     0x00ff00, // Green
     0xffff00, // Yellow
     0xff00ff, // Magenta
+    0x00ffff, // Cyan
+    0xff8000, // Orange
+    0x8000ff, // Purple
   ];
 
-  // AI car names
-  const aiNames = ["SPEEDY", "RACER", "ZOOM", "FLASH"];
-
-  // Calculate lane width for 3 cars side by side
-  const laneWidth = config.trackWidth / 3;
-
-  // Create grid positions for all cars (5 positions: 3 front, 2 back)
-  const gridPositions = [
-    { x: -laneWidth, z: 0 }, // Front left
-    { x: 0, z: 0 }, // Front center
-    { x: laneWidth, z: 0 }, // Front right
-    { x: -laneWidth / 2, z: -6 }, // Back left
-    { x: laneWidth / 2, z: -6 }, // Back right
+  const aiNames = [
+    "Speedy",
+    "Racer",
+    "Zoom",
+    "Flash",
+    "Thunder",
+    "Lightning",
+    "Bolt",
+    "Dash",
   ];
 
-  // Shuffle grid positions randomly
-  for (let i = gridPositions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [gridPositions[i], gridPositions[j]] = [gridPositions[j], gridPositions[i]];
-  }
-
-  // Assign player to first position in shuffled array
-  const playerPosition = gridPositions.shift();
-  playerCar.position.set(playerPosition.x, 0, playerPosition.z);
-  console.log(
-    `Positioned player car at (${playerPosition.x}, 0, ${playerPosition.z})`
-  );
-
-  // Create AI cars in remaining positions
+  // Create AI cars
   for (let i = 0; i < config.aiCars; i++) {
     // Use different color for each AI car
     const color = aiColors[i % aiColors.length];
@@ -370,12 +246,11 @@ function initAICars() {
 
     const aiCar = createCar(color, name);
 
-    // Get next position from shuffled array
-    const position = gridPositions[i];
-    aiCar.position.set(position.x, 0, position.z);
+    // Position AI car at start line
+    aiCar.position.set(i * 4 - 6, 0, -40); // Spread cars across starting line
 
     scene.add(aiCar);
-    aiCars.push(aiCar);
+    window.aiCars.push(aiCar);
 
     // Add name and color to car for leaderboard
     aiCar.userData.name = name;
@@ -386,27 +261,21 @@ function initAICars() {
       speed: 0,
       maxSpeed: 0,
       acceleration: 0,
-      currentGear: 0,
-      targetGear: 0,
+      currentGear: 1, // Start in 1st gear
+      targetGear: 1,
       isChangingGear: false,
       gearChangeStart: 0,
       rpm: 0,
       wheelspin: 0,
       lastGearChangeTime: 0,
+      distance: 0,
     };
 
-    // Random initial steering direction
-    aiCar.userData.steeringDirection = (Math.random() - 0.5) * 0.2;
-    aiCar.userData.steering = 0;
-
     console.log(
-      `Created AI car ${name} at position (${position.x}, 0, ${
-        position.z
-      }) with color 0x${color.toString(16)}`
+      `Created AI car ${name} with color 0x${color.toString(16)} at position:`,
+      aiCar.position
     );
   }
 
-  console.log(
-    `Created ${aiCars.length} AI cars with different colors and names in random positions`
-  );
+  console.log(`Created ${window.aiCars.length} AI cars for single player mode`);
 }

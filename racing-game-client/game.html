@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Racing Game</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="game-container">
+      <!-- HUD Elements -->
+      <div id="hud">
+        <div id="speedometer">
+          <div class="label">SPEED</div>
+          <div class="value"><span id="speed">0</span> km/h</div>
+        </div>
+        <div id="tachometer">
+          <div class="label">RPM</div>
+          <div class="value"><span id="rpm">0</span></div>
+          <div id="tach-display">
+            <div id="tach-needle"></div>
+          </div>
+        </div>
+        <div id="gear-indicator">
+          <div class="label">GEAR</div>
+          <div class="value"><span id="gear">N</span></div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div id="leaderboard">
+        <div class="title">POSITIONS</div>
+        <div id="positions"></div>
+      </div>
+
+      <!-- Audio Start Overlay -->
+      <div id="audioStartOverlay">
+        <div class="content">
+          <h2>Racing Game</h2>
+          <p>Click to start with sound</p>
+          <button id="startWithSound">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Load Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Load Socket.io -->
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+
+    <!-- Load Game Scripts in correct order -->
+    <script src="js/gameState.js"></script>
+    <script src="js/scene.js"></script>
+    <script src="js/car.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/multiplayer.js"></script>
+
+    <!-- Load Refactored Modules -->
+    <script src="js/ui.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/camera.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/core.js"></script>
+
+    <!-- Load Main Game File Last -->
+    <script src="js/game.js"></script>
+  </body>
+</html>
