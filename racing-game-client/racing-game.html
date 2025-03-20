@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Racing Game</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="gameContainer">
+      <!-- HUD elements -->
+      <div id="hud">
+        <div>Speed: <span id="speed">0</span> km/h</div>
+        <div>Max Speed: <span id="maxSpeed">0</span> km/h</div>
+        <div>Time: <span id="time">00:00.000</span></div>
+        <div class="gear-display">Gear: <span id="gear">N</span></div>
+        <div class="rpm-display">
+          <div>RPM: <span id="rpm">0</span>%</div>
+          <div class="tachometer">
+            <div id="tachometer-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div id="leaderboard">
+        <h3>Positions</h3>
+        <div id="positions">
+          <div>1. You</div>
+          <div>2. AI Car 1</div>
+          <div>3. AI Car 2</div>
+          <div>4. AI Car 3</div>
+        </div>
+      </div>
+
+      <!-- Mobile controls -->
+      <div id="mobileControls">
+        <div id="leftBtn" class="controlBtn">←</div>
+        <div id="upBtn" class="controlBtn">↑</div>
+        <div id="downBtn" class="controlBtn">↓</div>
+        <div id="rightBtn" class="controlBtn">→</div>
+      </div>
+
+      <!-- Wheelspin indicator -->
+      <div id="wheelspin-indicator">WHEELSPIN!</div>
+
+      <!-- Game over modal -->
+      <div id="gameOverModal">
+        <div class="modalContent">
+          <h2>Race Complete!</h2>
+          <div id="raceStats">
+            <!-- Will be filled dynamically -->
+          </div>
+          <button id="restartBtn">Restart Race</button>
+        </div>
+      </div>
+
+      <!-- Audio start overlay -->
+      <div id="audioStartOverlay">
+        <div class="overlayContent">
+          <h2>Racing Game</h2>
+          <p>Click to start with sound</p>
+          <button id="startAudioBtn">Start Game</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Game modules -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/track.js"></script>
+    <script src="js/car.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/physics.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+  </body>
+</html>
