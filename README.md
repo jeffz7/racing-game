@@ -47,7 +47,7 @@ This project consists of two main components:
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/yourusername/racing-game.git
+   git clone https://github.com/jeffz7/racing-game.git
    cd racing-game
    ```
 
