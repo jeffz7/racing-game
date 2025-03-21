@@ -318,7 +318,172 @@ function shiftGearDown() {
   }
 }
 
-// Export functions
-window.updatePlayerCar = updatePlayerCar;
-window.shiftGearUp = shiftGearUp;
-window.shiftGearDown = shiftGearDown;
+// Calculate car physics
+function calculateCarPhysics(accelerator, brake, steering, deltaTime) {
+  // Constants
+  const maxSpeed = 200; // km/h
+  const acceleration = 50; // km/h per second
+  const braking = 100; // km/h per second
+  const drag = 10; // km/h per second
+  const maxRPM = 8000;
+  const idleRPM = 800;
+  const gearRatios = [0, 3.5, 2.5, 1.8, 1.3, 1.0, 0.8];
+  const finalDriveRatio = 3.7;
+  const wheelRadius = 0.3; // meters
+
+  // Current state
+  let speed = gameState.speed;
+  let rpm = gameState.rpm;
+  let gear = gameState.currentGear;
+
+  // Calculate acceleration and braking forces
+  let accelerationForce = 0;
+  if (accelerator > 0) {
+    accelerationForce = accelerator * acceleration * deltaTime;
+  }
+
+  let brakingForce = 0;
+  if (brake > 0) {
+    brakingForce = brake * braking * deltaTime;
+  }
+
+  // Apply drag
+  const dragForce = (speed / maxSpeed) * drag * deltaTime;
+
+  // Update speed
+  speed += accelerationForce - brakingForce - dragForce;
+
+  // Clamp speed
+  speed = Math.max(0, Math.min(speed, maxSpeed));
+
+  // Calculate RPM based on speed and gear
+  if (speed > 0) {
+    // RPM = (speed in m/s) * (60 seconds) * (gearRatio * finalDriveRatio) / (2 * PI * wheelRadius)
+    const speedMPS = speed / 3.6; // Convert km/h to m/s
+    rpm =
+      (speedMPS * 60 * gearRatios[gear] * finalDriveRatio) /
+      (2 * Math.PI * wheelRadius);
+  } else {
+    rpm = idleRPM;
+  }
+
+  // Clamp RPM
+  rpm = Math.max(idleRPM, Math.min(rpm, maxRPM));
+
+  // Automatic gear shifting
+  if (rpm > maxRPM * 0.9 && gear < gearRatios.length - 1) {
+    gear++;
+    playGearShiftSound();
+  } else if (rpm < maxRPM * 0.4 && gear > 1) {
+    gear--;
+    playGearShiftSound();
+  }
+
+  // Calculate forward velocity in units per second
+  const forwardVelocity = speed / 3.6; // Convert km/h to m/s
+
+  // Calculate lateral velocity based on steering
+  const lateralVelocity = steering * (speed / maxSpeed) * 5;
+
+  return {
+    speed: speed,
+    rpm: rpm,
+    gear: gear,
+    forwardVelocity: forwardVelocity,
+    lateralVelocity: lateralVelocity,
+  };
+}
+
+// Physics simulation
+
+// Initialize physics
+function initPhysics() {
+  console.log("Initializing physics");
+
+  // Set up physics parameters
+  gameState.gravity = 9.8; // m/s²
+  gameState.friction = 0.05;
+  gameState.drag = 0.5;
+  gameState.acceleration = 10;
+  gameState.brakeForce = 15;
+  gameState.turnSpeed = 2.0;
+  gameState.maxSpeed = 50;
+
+  console.log("Physics initialized");
+}
+
+// Update physics
+function updatePhysics(deltaTime) {
+  // Apply physics to car
+  if (gameState.handbrake) {
+    // Handbrake reduces speed faster and allows drifting
+    gameState.speed *= 0.95;
+  }
+
+  // Check for collisions with track boundaries
+  checkTrackBoundaries();
+
+  // Check if car has reached finish line
+  checkFinishLine();
+}
+
+// Check if car is within track boundaries
+function checkTrackBoundaries() {
+  if (!window.playerCar) return;
+
+  // Simple boundary check - keep car on the road
+  // Road is 10 units wide, centered at x=0
+  const roadHalfWidth = 5;
+
+  if (Math.abs(window.playerCar.position.x) > roadHalfWidth) {
+    // Car is off the road, apply friction
+    gameState.speed *= 0.95;
+  }
+}
+
+// Check if car has reached finish line
+function checkFinishLine() {
+  if (!window.playerCar) return;
+
+  // Check if car has crossed finish line
+  if (
+    window.playerCar.position.z >= gameState.finishLinePosition &&
+    !gameState.finished
+  ) {
+    gameState.finished = true;
+
+    // Show finish message
+    const finishMessage = document.getElementById("finish-message");
+    if (finishMessage) {
+      finishMessage.textContent = "Finish!";
+      finishMessage.style.display = "block";
+    }
+
+    console.log("Player finished race");
+
+    // Send finish event to server if in multiplayer mode
+    if (
+      window.multiplayer &&
+      window.multiplayer.connection &&
+      window.multiplayer.connection.socket
+    ) {
+      window.multiplayer.connection.socket.emit("playerFinished", {
+        time: Date.now() - gameState.startTime,
+        distance: gameState.distance,
+      });
+    }
+  }
+}
+
+// Export functions to global scope
+window.initPhysics = initPhysics;
+window.updatePhysics = updatePhysics;
+window.checkTrackBoundaries = checkTrackBoundaries;
+window.checkFinishLine = checkFinishLine;
+
+// Log to confirm they're defined
+console.log("Physics functions defined:");
+console.log("- initPhysics:", typeof window.initPhysics);
+console.log("- updatePhysics:", typeof window.updatePhysics);
+console.log("- checkTrackBoundaries:", typeof window.checkTrackBoundaries);
+console.log("- checkFinishLine:", typeof window.checkFinishLine);

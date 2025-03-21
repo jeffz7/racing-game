@@ -6,9 +6,13 @@ let engineSound;
 let isEngineRunning = false;
 let isAccelerating = false;
 let isBraking = false;
+let gearShiftSound;
+let tireSquealSound;
 
 // Initialize audio system
 function initAudio() {
+  console.log("Initializing audio...");
+
   // Create audio context
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -17,6 +21,22 @@ function initAudio() {
 
   // Create engine sound
   createEngineSound();
+
+  // Create gear shift sound
+  gearShiftSound = new Audio("sounds/gear_shift.mp3");
+  tireSquealSound = new Audio("sounds/wheelspin.mp3");
+  tireSquealSound.loop = true;
+  tireSquealSound.volume = 0;
+
+  // Start engine sound
+  engineSound.play().catch((error) => {
+    console.warn("Could not play engine sound automatically:", error);
+  });
+
+  // Start tire squeal sound (with volume 0)
+  tireSquealSound.play().catch((error) => {
+    console.warn("Could not play tire squeal sound automatically:", error);
+  });
 }
 
 // Load all sound effects
@@ -295,6 +315,27 @@ function playFinishSound() {
   playSound("finish", { volume: 1.0 });
 }
 
+// Play gear shift sound
+function playGearShiftSound() {
+  if (!gearShiftSound) return;
+
+  // Clone the audio to allow overlapping sounds
+  const sound = gearShiftSound.cloneNode();
+  sound.volume = 0.5;
+
+  sound.play().catch((error) => {
+    console.warn("Could not play gear shift sound:", error);
+  });
+}
+
+// Play tire squeal sound
+function playTireSquealSound(intensity) {
+  if (!tireSquealSound) return;
+
+  // Set volume based on intensity (0-1)
+  tireSquealSound.volume = Math.min(intensity, 1) * 0.5;
+}
+
 // Stop all sounds (for game reset)
 function stopAllSounds() {
   // Silence engine
@@ -320,3 +361,27 @@ function stopAllSounds() {
   isAccelerating = false;
   isBraking = false;
 }
+
+// Initialize audio when the page loads
+window.addEventListener("load", () => {
+  // Initialize with a user interaction to satisfy autoplay policy
+  const startAudioButton = document.createElement("button");
+  startAudioButton.textContent = "Start Audio";
+  startAudioButton.style.position = "absolute";
+  startAudioButton.style.top = "10px";
+  startAudioButton.style.right = "10px";
+  startAudioButton.style.zIndex = "1000";
+
+  startAudioButton.addEventListener("click", () => {
+    initAudio();
+    startAudioButton.remove();
+  });
+
+  document.body.appendChild(startAudioButton);
+});
+
+// Export functions
+window.updateEngineSound = updateEngineSound;
+window.playGearShiftSound = playGearShiftSound;
+window.playTireSquealSound = playTireSquealSound;
+window.stopAllSounds = stopAllSounds;

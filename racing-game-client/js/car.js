@@ -1,64 +1,118 @@
 // Complete overhaul of car creation and movement
 
-// Create a car with the given color
-function createCar(color, name) {
-  console.log(`Creating car with color ${color} and name ${name}`);
+// Create player car (use window.playerCar to avoid redeclaration)
+window.playerCar = null;
 
-  // Create car container
-  const car = new THREE.Group();
-
+// Function to create a car
+function createCar(color = 0x3498db, name = "Player") {
   // Create car body
-  const bodyGeometry = new THREE.BoxGeometry(2, 1, 4);
-  const bodyMaterial = new THREE.MeshPhongMaterial({ color: color });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.position.y = 0.5;
-  body.castShadow = true;
-  car.add(body);
+  const carBody = new THREE.Group();
 
-  // Create car roof
-  const roofGeometry = new THREE.BoxGeometry(1.5, 0.7, 2);
-  const roofMaterial = new THREE.MeshPhongMaterial({ color: 0x333333 });
-  const roof = new THREE.Mesh(roofGeometry, roofMaterial);
-  roof.position.y = 1.35;
-  roof.position.z = -0.5;
-  roof.castShadow = true;
-  car.add(roof);
+  // Create car chassis
+  const chassisGeometry = new THREE.BoxGeometry(2, 0.5, 4);
+  const chassisMaterial = new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.2,
+    metalness: 0.8,
+    emissive: color,
+    emissiveIntensity: 0.2,
+  });
+  const chassis = new THREE.Mesh(chassisGeometry, chassisMaterial);
+  chassis.position.y = 0.5;
+  chassis.castShadow = true;
+  chassis.receiveShadow = true;
+  carBody.add(chassis);
+
+  // Create car cabin
+  const cabinGeometry = new THREE.BoxGeometry(1.5, 0.8, 2);
+  const cabinMaterial = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    roughness: 0.1,
+    metalness: 0.9,
+    transparent: true,
+    opacity: 0.7,
+  });
+  const cabin = new THREE.Mesh(cabinGeometry, cabinMaterial);
+  cabin.position.y = 1.15;
+  cabin.position.z = -0.5;
+  cabin.castShadow = true;
+  cabin.receiveShadow = true;
+  carBody.add(cabin);
+
+  // Create car front (more aerodynamic)
+  const frontGeometry = new THREE.ConeGeometry(1, 1, 4);
+  frontGeometry.rotateX(-Math.PI / 2);
+  const frontMaterial = new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.2,
+    metalness: 0.8,
+    emissive: color,
+    emissiveIntensity: 0.2,
+  });
+  const front = new THREE.Mesh(frontGeometry, frontMaterial);
+  front.position.set(0, 0.5, 2);
+  front.castShadow = true;
+  front.receiveShadow = true;
+  carBody.add(front);
+
+  // Create wheels with better detail
+  const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+  const wheelMaterial = new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    roughness: 0.9,
+    metalness: 0.1,
+  });
+
+  // Create wheel rim material
+  const rimMaterial = new THREE.MeshStandardMaterial({
+    color: 0xcccccc,
+    roughness: 0.1,
+    metalness: 0.9,
+    emissive: 0x555555,
+    emissiveIntensity: 0.2,
+  });
+
+  // Function to create a wheel with rim
+  function createWheel(x, y, z) {
+    const wheelGroup = new THREE.Group();
+
+    // Tire
+    const tire = new THREE.Mesh(wheelGeometry, wheelMaterial);
+    tire.rotation.z = Math.PI / 2;
+    wheelGroup.add(tire);
+
+    // Rim (slightly smaller than tire)
+    const rimGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.31, 8);
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.rotation.z = Math.PI / 2;
+    wheelGroup.add(rim);
+
+    // Position the wheel
+    wheelGroup.position.set(x, y, z);
+    wheelGroup.castShadow = true;
+    wheelGroup.receiveShadow = true;
+
+    return wheelGroup;
+  }
 
   // Create wheels
-  const wheelGeometry = new THREE.CylinderGeometry(0.5, 0.5, 0.4, 32);
-  const wheelMaterial = new THREE.MeshPhongMaterial({ color: 0x111111 });
+  const wheelFL = createWheel(-1.1, 0.4, 1.2);
+  const wheelFR = createWheel(1.1, 0.4, 1.2);
+  const wheelRL = createWheel(-1.1, 0.4, -1.2);
+  const wheelRR = createWheel(1.1, 0.4, -1.2);
 
-  // Front left wheel
-  const wheelFL = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  wheelFL.rotation.z = Math.PI / 2;
-  wheelFL.position.set(-1.2, 0.5, 1.2);
-  wheelFL.castShadow = true;
-  car.add(wheelFL);
+  // Add wheels to car
+  carBody.add(wheelFL);
+  carBody.add(wheelFR);
+  carBody.add(wheelRL);
+  carBody.add(wheelRR);
 
-  // Front right wheel
-  const wheelFR = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  wheelFR.rotation.z = Math.PI / 2;
-  wheelFR.position.set(1.2, 0.5, 1.2);
-  wheelFR.castShadow = true;
-  car.add(wheelFR);
+  // Store wheels for animation
+  carBody.wheels = [wheelFL, wheelFR, wheelRL, wheelRR];
 
-  // Rear left wheel
-  const wheelRL = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  wheelRL.rotation.z = Math.PI / 2;
-  wheelRL.position.set(-1.2, 0.5, -1.2);
-  wheelRL.castShadow = true;
-  car.add(wheelRL);
-
-  // Rear right wheel
-  const wheelRR = new THREE.Mesh(wheelGeometry, wheelMaterial);
-  wheelRR.rotation.z = Math.PI / 2;
-  wheelRR.position.set(1.2, 0.5, -1.2);
-  wheelRR.castShadow = true;
-  car.add(wheelRR);
-
-  // Create headlights
-  const headlightGeometry = new THREE.BoxGeometry(0.5, 0.3, 0.1);
-  const headlightMaterial = new THREE.MeshPhongMaterial({
+  // Add headlights
+  const headlightGeometry = new THREE.CircleGeometry(0.2, 16);
+  const headlightMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffcc,
     emissive: 0xffffcc,
     emissiveIntensity: 0.5,
@@ -66,17 +120,19 @@ function createCar(color, name) {
 
   // Left headlight
   const headlightL = new THREE.Mesh(headlightGeometry, headlightMaterial);
-  headlightL.position.set(-0.7, 0.7, 2);
-  car.add(headlightL);
+  headlightL.position.set(-0.6, 0.7, 2);
+  headlightL.rotation.y = Math.PI;
+  carBody.add(headlightL);
 
   // Right headlight
   const headlightR = new THREE.Mesh(headlightGeometry, headlightMaterial);
-  headlightR.position.set(0.7, 0.7, 2);
-  car.add(headlightR);
+  headlightR.position.set(0.6, 0.7, 2);
+  headlightR.rotation.y = Math.PI;
+  carBody.add(headlightR);
 
-  // Create taillights
-  const taillightGeometry = new THREE.BoxGeometry(0.5, 0.3, 0.1);
-  const taillightMaterial = new THREE.MeshPhongMaterial({
+  // Add taillights
+  const taillightGeometry = new THREE.CircleGeometry(0.15, 16);
+  const taillightMaterial = new THREE.MeshStandardMaterial({
     color: 0xff0000,
     emissive: 0xff0000,
     emissiveIntensity: 0.5,
@@ -84,85 +140,121 @@ function createCar(color, name) {
 
   // Left taillight
   const taillightL = new THREE.Mesh(taillightGeometry, taillightMaterial);
-  taillightL.position.set(-0.7, 0.7, -2);
-  car.add(taillightL);
+  taillightL.position.set(-0.6, 0.7, -2);
+  carBody.add(taillightL);
 
   // Right taillight
   const taillightR = new THREE.Mesh(taillightGeometry, taillightMaterial);
-  taillightR.position.set(0.7, 0.7, -2);
-  car.add(taillightR);
+  taillightR.position.set(0.6, 0.7, -2);
+  carBody.add(taillightR);
 
-  // Add name label
+  // Add player name label
   if (name) {
-    // Create a canvas for the label
+    // Create canvas for text
     const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
     canvas.width = 256;
     canvas.height = 64;
-    const context = canvas.getContext("2d");
-
-    // Draw background
-    context.fillStyle = "rgba(0, 0, 0, 0.7)";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw border
-    context.strokeStyle = "white";
-    context.lineWidth = 2;
-    context.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
 
     // Draw text
-    context.font = "24px Arial";
-    context.fillStyle = "white";
+    context.fillStyle = "#ffffff";
+    context.font = "Bold 24px Arial";
     context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText(name, canvas.width / 2, canvas.height / 2);
+    context.fillText(name, 128, 32);
 
-    // Create texture and sprite
+    // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ map: texture });
-    const sprite = new THREE.Sprite(material);
-
-    // Position the sprite above the car
-    sprite.position.set(0, 2.5, 0);
-    sprite.scale.set(2, 0.5, 1);
-
-    // Add sprite to car
-    car.add(sprite);
-
-    // Store reference to label
-    car.userData.label = sprite;
+    const labelMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+    });
+    const label = new THREE.Sprite(labelMaterial);
+    label.position.y = 2.5;
+    label.scale.set(2, 0.5, 1);
+    carBody.add(label);
   }
 
-  // Store metadata
-  car.userData = {
-    ...car.userData,
+  // Set initial position
+  carBody.position.set(0, 0, 0);
+
+  // Set initial rotation (facing forward along Z axis)
+  carBody.rotation.y = 0;
+
+  // Add car to scene
+  carBody.userData = {
+    speed: 0,
+    acceleration: 0,
+    maxSpeed: 0.5,
+    handling: 0.03,
+    wheels: [wheelFL, wheelFR, wheelRL, wheelRR],
     name: name,
-    color: color,
-    wheels: {
-      fl: wheelFL,
-      fr: wheelFR,
-      rl: wheelRL,
-      rr: wheelRR,
-    },
   };
 
-  console.log(`Car created with name ${name}`);
+  return carBody;
+}
+
+// Function to create player car
+function createPlayerCar() {
+  console.log("Creating player car");
+
+  if (!window.scene) {
+    console.error("Cannot create player car: scene is undefined");
+    return null;
+  }
+
+  // Create car with blue color
+  const car = createCar(0x3498db, "Player");
+  car.position.set(0, 0, 0);
+  window.scene.add(car);
+
+  // Store reference to player car
+  window.playerCar = car;
+
+  console.log("Player car created");
+
   return car;
 }
 
-// Function to update car wheels based on speed
-function updateCarWheels(car, speed) {
-  if (!car || !car.userData || !car.userData.wheels) return;
+// Function to update car position and rotation
+function updateCar(car) {
+  if (!car) return;
 
-  const wheels = car.userData.wheels;
-  const rotationSpeed = speed * 0.01;
+  // Get car data
+  const carData = car.userData;
 
-  // Rotate all wheels
-  wheels.fl.rotation.x += rotationSpeed;
-  wheels.fr.rotation.x += rotationSpeed;
-  wheels.rl.rotation.x += rotationSpeed;
-  wheels.rr.rotation.x += rotationSpeed;
+  // Update car position based on speed and rotation
+  car.position.x += Math.sin(car.rotation.y) * carData.speed;
+  car.position.z += Math.cos(car.rotation.y) * carData.speed;
+
+  // Apply friction to gradually slow down the car
+  carData.speed *= 0.98;
 }
 
-// Export functions
+// Function to update car wheels rotation
+function updateCarWheels(car) {
+  if (!car) return;
+
+  // Get car data
+  const carData = car.userData;
+
+  // Calculate wheel rotation speed based on car speed
+  const wheelRotationSpeed = carData.speed * 0.5;
+
+  // Update each wheel rotation
+  for (const wheel of carData.wheels) {
+    wheel.rotation.x += wheelRotationSpeed;
+  }
+}
+
+// Export functions to global scope
 window.createCar = createCar;
+window.createPlayerCar = createPlayerCar;
+window.updateCar = updateCar;
 window.updateCarWheels = updateCarWheels;
+
+// Log to confirm they're defined
+console.log("Car functions defined:");
+console.log("- createCar:", typeof window.createCar);
+console.log("- createPlayerCar:", typeof window.createPlayerCar);
+console.log("- updateCar:", typeof window.updateCar);
+console.log("- updateCarWheels:", typeof window.updateCarWheels);

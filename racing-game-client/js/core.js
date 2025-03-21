@@ -1,130 +1,122 @@
 // Core game functionality - initialization and main loop
 
 // Global variables
+let playerCar;
 let lastTime = 0;
 
 // Initialize the game
 function init() {
-  console.log("Initializing game...");
+  console.log("Initializing game");
 
-  // Reset game state
-  gameState.reset();
-
-  // Initialize player controls
-  initPlayerControls();
-
-  // Check if coming from lobby (multiplayer)
-  const playerName = localStorage.getItem("playerName");
-  const gameId = localStorage.getItem("gameId");
-  const serverUrl = localStorage.getItem("serverUrl");
-
-  console.log("Retrieved from localStorage:", {
-    playerName,
-    gameId,
-    serverUrl,
-  });
-
-  // Create player car
-  playerCar = createCar(0x0000ff, playerName || "YOU"); // Blue car
-
-  // Position car at the start line
-  playerCar.position.set(0, 0, 0); // Start line position
-
-  scene.add(playerCar);
-  console.log("Created player car and added to scene at start line");
-
-  // Store reference to player car in window for debugging
-  window.playerCar = playerCar;
-
-  // Set initial gear to 1st
-  gameState.currentGear = 1;
-
-  if (playerName && gameId && serverUrl) {
-    console.log("Initializing multiplayer mode");
-
-    // Initialize multiplayer
-    gameState.isMultiplayer = true;
-
-    // Create multiplayer manager
-    window.multiplayer = new MultiplayerManager(window);
-
-    // Connect to server
-    window.multiplayer.connect(serverUrl, gameId, playerName);
-
-    // Show ready button
-    showReadyButton();
-
-    // Add a debug message to the UI
-    showDebugMessage(`Multiplayer mode: ${playerName} in room ${gameId}`);
+  // Create track
+  if (window.createTrack) {
+    window.createTrack();
   } else {
-    console.log("Initializing single player mode");
-
-    // Single player mode - initialize AI cars
-    initAICars();
-
-    // Start the race immediately in single player mode
-    gameState.started = true;
-
-    // Show audio start overlay
-    const audioStartOverlay = document.getElementById("audioStartOverlay");
-    if (audioStartOverlay) {
-      audioStartOverlay.style.display = "flex";
-    }
+    console.error("createTrack function not found");
   }
 
-  // Load sounds
-  if (typeof loadSounds === "function") {
-    loadSounds();
+  // Add environment objects
+  if (window.addEnvironmentObjects) {
+    window.addEnvironmentObjects();
+  }
+
+  // Create player car
+  if (window.createPlayerCar) {
+    window.createPlayerCar();
+  } else {
+    console.error("createPlayerCar function not found");
+  }
+
+  // Initialize physics
+  if (window.initPhysics) {
+    window.initPhysics();
+  } else {
+    console.error("initPhysics function not found");
+  }
+
+  // Initialize input
+  if (window.initInput) {
+    window.initInput();
+  } else {
+    console.error("initInput function not found");
+  }
+
+  // Initialize UI
+  if (window.initUI) {
+    window.initUI();
+  } else {
+    console.warn("initUI function not found");
   }
 
   // Start animation loop
-  animate(0);
+  animate();
 
   console.log("Game initialized");
 }
 
-// Game loop
-function animate(time) {
+// Handle window resize
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// Get game parameters from URL or localStorage
+function getGameParams() {
+  // Check localStorage first
+  const playerName = localStorage.getItem("playerName");
+  const gameId = localStorage.getItem("gameId");
+  const serverUrl = localStorage.getItem("serverUrl");
+  const createdGameId = localStorage.getItem("createdGameId");
+  const isHost = localStorage.getItem("isHost") === "true";
+
+  return {
+    playerName,
+    gameId,
+    serverUrl,
+    createdGameId,
+    isHost,
+  };
+}
+
+// Animation loop
+function animate() {
   requestAnimationFrame(animate);
 
-  // Calculate delta time
-  const deltaTime = lastTime ? (time - lastTime) / 1000 : 0.016;
-  lastTime = time;
+  // Check if scene, camera, and renderer exist
+  if (!window.scene || !window.camera || !window.renderer) {
+    console.error("Cannot render: renderer, scene, or camera is undefined");
+    return;
+  }
 
-  // Cap delta time to prevent large jumps
-  const cappedDeltaTime = Math.min(deltaTime, 0.1);
-
-  // Update game
-  update(cappedDeltaTime);
+  // Update game state
+  update();
 
   // Render scene
-  renderer.render(scene, camera);
+  window.renderer.render(window.scene, window.camera);
 }
 
 // Update game state
-function update(deltaTime) {
-  // Update player car
-  updatePlayerCar(deltaTime);
+function update() {
+  // Update physics
+  if (window.updatePhysics) {
+    window.updatePhysics();
+  }
+
+  // Update car
+  if (window.updateCar && window.playerCar) {
+    window.updateCar(window.playerCar);
+  }
+
+  // Update car wheels
+  if (window.updateCarWheels && window.playerCar) {
+    window.updateCarWheels(window.playerCar);
+  }
 
   // Update camera
-  updateCamera();
-
-  // Update AI cars in single player mode
-  if (!gameState.isMultiplayer && window.aiCars) {
-    updateAICars(deltaTime);
+  if (window.updateCamera && window.playerCar) {
+    window.updateCamera(window.playerCar);
   }
-
-  // Update multiplayer
-  if (gameState.isMultiplayer && window.multiplayer) {
-    // Send position updates to server
-    window.multiplayer.sendPosition();
-  }
-
-  // Update UI
-  updateSpeedometer();
-  updateTachometer();
-  updateGearIndicator();
-  updateLeaderboard();
 }
 
 // Finish race
@@ -167,3 +159,91 @@ window.addEventListener("load", init);
 
 // Export functions
 window.finishRace = finishRace;
+
+function updatePlayerCar(deltaTime) {
+  // Don't update if player has finished
+  if (gameState.finished) {
+    return;
+  }
+
+  // For multiplayer, only allow movement if race has started or countdown is active
+  if (gameState.isMultiplayer) {
+    if (!gameState.started && !gameState.countdown) {
+      return;
+    }
+  }
+
+  // Get input values
+  const accelerator = getAcceleratorInput();
+  const brake = getBrakeInput();
+  const steering = getSteeringInput();
+
+  // Apply physics
+  const physics = calculateCarPhysics(accelerator, brake, steering, deltaTime);
+
+  // Update car position
+  playerCar.position.z -= physics.forwardVelocity * deltaTime;
+  playerCar.position.x += physics.lateralVelocity * deltaTime;
+
+  // Update car rotation
+  playerCar.rotation.y = steering * 0.5;
+
+  // Update wheels
+  updateCarWheels(playerCar, gameState.speed);
+
+  // Update game state
+  gameState.speed = physics.speed;
+  gameState.rpm = physics.rpm;
+  gameState.distance += physics.forwardVelocity * deltaTime;
+  gameState.currentGear = physics.gear;
+
+  // Check for finish
+  if (gameState.distance >= gameState.finishDistance && !gameState.finished) {
+    finishRace();
+  }
+
+  // Update engine sound
+  if (typeof updateEngineSound === "function") {
+    updateEngineSound(gameState.rpm, accelerator);
+  }
+
+  // Play tire squeal sound if drifting
+  if (
+    typeof playTireSquealSound === "function" &&
+    Math.abs(physics.lateralVelocity) > 0.5
+  ) {
+    playTireSquealSound(Math.abs(physics.lateralVelocity) / 2);
+  }
+}
+
+// Update camera
+function updateCamera(car) {
+  if (!car || !window.camera) return;
+
+  // Position camera behind car
+  const cameraOffset = new THREE.Vector3(0, 5, 10);
+  const cameraTarget = new THREE.Vector3(
+    car.position.x,
+    car.position.y,
+    car.position.z
+  );
+
+  // Apply offset
+  window.camera.position.x = cameraTarget.x + cameraOffset.x;
+  window.camera.position.y = cameraTarget.y + cameraOffset.y;
+  window.camera.position.z = cameraTarget.z + cameraOffset.z;
+
+  // Look at car
+  window.camera.lookAt(cameraTarget);
+}
+
+// Export functions
+window.animate = animate;
+window.update = update;
+window.init = init;
+
+// Log to confirm they're defined
+console.log("Core functions defined:");
+console.log("- animate:", typeof window.animate);
+console.log("- update:", typeof window.update);
+console.log("- init:", typeof window.init);

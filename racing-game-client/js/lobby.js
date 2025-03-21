@@ -116,39 +116,27 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Generate 5-character game ID (uppercase letters and numbers only)
+    // Generate game ID
     const gameId = generateGameId();
+
+    // Store game ID as created by this client
+    localStorage.setItem("createdGameId", gameId);
 
     // Save data to localStorage
     saveGameData(playerName, gameId, serverUrl);
 
     // Redirect to game
-    showStatus(`Creating game ${gameId}...`, "info");
-
-    // Display game code prominently before redirecting
-    const codeDisplay = document.createElement("div");
-    codeDisplay.className = "game-code-display";
-    codeDisplay.innerHTML = `
-      <div class="code-label">GAME CODE:</div>
-      <div class="code-value">${gameId}</div>
-      <div class="code-instruction">Share this code with other players</div>
-    `;
-
-    // Replace status with code display
-    statusElement.innerHTML = "";
-    statusElement.appendChild(codeDisplay);
-    statusElement.className = "status info";
-
+    showStatus(`Created game ${gameId}. Redirecting...`, "info");
     setTimeout(() => {
       window.location.href = "game.html";
-    }, 3000); // Give players more time to see and copy the code
+    }, 1000);
   });
 
   // Join game confirmation
   btnJoinConfirm.addEventListener("click", () => {
     const playerName = joinPlayerName.value.trim();
     const serverUrl = joinServerUrl.value.trim();
-    const gameId = joinGameId.value.trim().toUpperCase();
+    const gameId = joinGameId.value.trim();
 
     if (!playerName) {
       showStatus("Please enter your name", "error");
@@ -160,10 +148,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (!gameId || gameId.length !== 5) {
-      showStatus("Please enter a valid 5-character game code", "error");
+    if (!gameId) {
+      showStatus("Please enter game ID", "error");
       return;
     }
+
+    // Clear created game ID since we're joining, not creating
+    localStorage.removeItem("createdGameId");
 
     // Save data to localStorage
     saveGameData(playerName, gameId, serverUrl);
@@ -190,6 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Clear multiplayer data
     localStorage.removeItem("gameId");
     localStorage.removeItem("serverUrl");
+    localStorage.removeItem("createdGameId");
 
     // Redirect to game
     showStatus("Starting single player mode...", "info");

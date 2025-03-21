@@ -5,66 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Racing Game</title>
     <link rel="stylesheet" href="css/style.css" />
+    <!-- Load Three.js first -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Socket.io -->
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
   </head>
   <body>
-    <div id="game-container">
-      <!-- HUD Elements -->
-      <div id="hud">
-        <div id="speedometer">
-          <div class="label">SPEED</div>
-          <div class="value"><span id="speed">0</span> km/h</div>
-        </div>
-        <div id="tachometer">
-          <div class="label">RPM</div>
-          <div class="value"><span id="rpm">0</span></div>
-          <div id="tach-display">
-            <div id="tach-needle"></div>
-          </div>
-        </div>
-        <div id="gear-indicator">
-          <div class="label">GEAR</div>
-          <div class="value"><span id="gear">N</span></div>
-        </div>
+    <!-- Game UI -->
+    <div id="ui">
+      <div id="speedometer">0 km/h</div>
+      <div id="tachometer">0 RPM</div>
+      <div id="gear">Gear: 1</div>
+      <div id="positions"></div>
+      <div id="countdown"></div>
+      <div id="connection-status"></div>
+      <div id="ready-button" style="display: none">
+        <button id="ready">Ready</button>
       </div>
-
-      <!-- Leaderboard -->
-      <div id="leaderboard">
-        <div class="title">POSITIONS</div>
-        <div id="positions"></div>
-      </div>
-
-      <!-- Audio Start Overlay -->
-      <div id="audioStartOverlay">
-        <div class="content">
-          <h2>Racing Game</h2>
-          <p>Click to start with sound</p>
-          <button id="startWithSound">Start Game</button>
-        </div>
-      </div>
+      <div id="finish-message" style="display: none"></div>
     </div>
 
-    <!-- Load Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Game canvas -->
+    <canvas id="game-canvas"></canvas>
 
-    <!-- Load Socket.io -->
-    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <!-- Load initialization script first -->
+    <script src="js/init-three.js"></script>
 
-    <!-- Load Game Scripts in correct order -->
-    <script src="js/gameState.js"></script>
+    <!-- Load utility scripts -->
+    <script src="js/utils.js"></script>
+
+    <!-- Load core game scripts -->
     <script src="js/scene.js"></script>
-    <script src="js/car.js"></script>
-    <script src="js/sound.js"></script>
-    <script src="js/ai.js"></script>
-    <script src="js/multiplayer.js"></script>
-
-    <!-- Load Refactored Modules -->
     <script src="js/ui.js"></script>
     <script src="js/input.js"></script>
-    <script src="js/camera.js"></script>
     <script src="js/physics.js"></script>
-    <script src="js/core.js"></script>
+    <script src="js/car.js"></script>
+    <script src="js/track.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/ai.js"></script>
 
-    <!-- Load Main Game File Last -->
+    <!-- Load multiplayer scripts -->
+    <script src="js/multiplayer-connection.js"></script>
+    <script src="js/multiplayer-players.js"></script>
+    <script src="js/multiplayer-sync.js"></script>
+    <script src="js/multiplayer-ai.js"></script>
+    <script src="js/multiplayer.js"></script>
+
+    <!-- Load core and game scripts last -->
+    <script src="js/core.js"></script>
     <script src="js/game.js"></script>
   </body>
 </html>

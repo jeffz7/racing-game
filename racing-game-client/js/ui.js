@@ -154,7 +154,7 @@ function updateHUD() {
   updateLeaderboard();
 }
 
-// Update leaderboard with multiplayer players
+// Update leaderboard with all players (including AI)
 function updateLeaderboard() {
   const positions = document.getElementById("positions");
   if (!positions) return;
@@ -175,6 +175,7 @@ function updateLeaderboard() {
 
   // Add remote players in multiplayer mode
   if (gameState.isMultiplayer && window.multiplayer) {
+    // Add remote players
     Object.values(window.multiplayer.otherPlayers).forEach((player) => {
       allPlayers.push({
         id: player.id,
@@ -184,51 +185,72 @@ function updateLeaderboard() {
         isLocal: false,
       });
     });
+
+    // Add AI cars in multiplayer mode
+    if (window.multiplayer.aiCars) {
+      window.multiplayer.aiCars.forEach((aiCar, index) => {
+        allPlayers.push({
+          id: `ai-${index}`,
+          name: aiCar.name,
+          distance: aiCar.distance || 0,
+          finished: aiCar.finished || false,
+          isLocal: false,
+          isAI: true,
+        });
+      });
+    }
   } else if (window.aiCars) {
     // Add AI cars in single player mode
     window.aiCars.forEach((car, index) => {
       allPlayers.push({
         id: `ai-${index}`,
-        name: car.userData.name,
-        distance: car.userData.aiState ? car.userData.aiState.distance : 0,
-        finished: car.userData.aiState ? car.userData.aiState.finished : false,
+        name: car.name,
+        distance: car.distance || 0,
+        finished: car.finished || false,
         isLocal: false,
+        isAI: true,
       });
     });
   }
 
-  // Sort players by distance (finished players at the top)
-  allPlayers.sort((a, b) => {
-    if (a.finished && !b.finished) return -1;
-    if (!a.finished && b.finished) return 1;
-    return b.distance - a.distance;
-  });
+  // Sort players by distance (descending)
+  allPlayers.sort((a, b) => b.distance - a.distance);
 
   // Add players to leaderboard
   allPlayers.forEach((player, index) => {
     const position = document.createElement("div");
     position.className = "position";
 
+    // Add position number
+    const posNumber = document.createElement("div");
+    posNumber.className = "pos-number";
+    posNumber.textContent = index + 1;
+    position.appendChild(posNumber);
+
+    // Add player name
+    const posName = document.createElement("div");
+    posName.className = "pos-name";
+
     // Highlight local player
     if (player.isLocal) {
-      position.classList.add("local-player");
+      posName.classList.add("local-player");
     }
 
-    // Format name
-    let displayName = player.name;
-    if (player.isLocal) {
-      displayName += " (YOU)";
+    // Add AI indicator
+    if (player.isAI) {
+      posName.classList.add("ai-player");
     }
 
-    // Format distance
-    const distance = player.distance ? Math.round(player.distance) : 0;
+    posName.textContent = player.name;
+    position.appendChild(posName);
 
-    // Create position content
-    position.innerHTML = `
-      <span class="pos">${index + 1}</span>
-      <span class="name">${displayName}</span>
-      <span class="distance">${distance}m</span>
-    `;
+    // Add finished indicator
+    if (player.finished) {
+      const finishedIndicator = document.createElement("div");
+      finishedIndicator.className = "finished-indicator";
+      finishedIndicator.textContent = "✓";
+      position.appendChild(finishedIndicator);
+    }
 
     positions.appendChild(position);
   });
@@ -421,38 +443,43 @@ function addDistanceIndicator() {
 }
 
 // Show countdown
-function showCountdown() {
-  const countdownOverlay = document.createElement("div");
-  countdownOverlay.style.position = "absolute";
-  countdownOverlay.style.top = "0";
-  countdownOverlay.style.left = "0";
-  countdownOverlay.style.width = "100%";
-  countdownOverlay.style.height = "100%";
-  countdownOverlay.style.display = "flex";
-  countdownOverlay.style.justifyContent = "center";
-  countdownOverlay.style.alignItems = "center";
-  countdownOverlay.style.fontSize = "150px";
-  countdownOverlay.style.color = "white";
-  countdownOverlay.style.textShadow = "0 0 10px black";
-  countdownOverlay.style.zIndex = "1000";
+function showCountdown(callback) {
+  console.log("Starting countdown...");
 
-  document.getElementById("gameContainer").appendChild(countdownOverlay);
+  const countdownElement = document.getElementById("countdown");
+  if (!countdownElement) {
+    console.error("Countdown element not found!");
+    return;
+  }
 
-  let count = 3;
-  countdownOverlay.textContent = count;
+  // Clear any existing countdown
+  countdownElement.innerHTML = "";
+  countdownElement.style.display = "flex";
 
+  // Set countdown values
+  const countdownValues = ["3", "2", "1", "GO!"];
+  let index = 0;
+
+  // Show first value
+  countdownElement.textContent = countdownValues[index];
+  console.log(`Countdown: ${countdownValues[index]}`);
+
+  // Start countdown interval
   const interval = setInterval(() => {
-    count--;
-    if (count > 0) {
-      countdownOverlay.textContent = count;
-    } else if (count === 0) {
-      countdownOverlay.textContent = "GO!";
-    } else {
-      clearInterval(interval);
-      countdownOverlay.remove();
+    index++;
 
-      // Start the race
-      startRace();
+    if (index < countdownValues.length) {
+      // Show next value
+      countdownElement.textContent = countdownValues[index];
+      console.log(`Countdown: ${countdownValues[index]}`);
+    } else {
+      // End countdown
+      clearInterval(interval);
+      countdownElement.style.display = "none";
+      console.log("Countdown finished, starting race");
+
+      // Call callback
+      if (callback) callback();
     }
   }, 1000);
 }
@@ -475,181 +502,65 @@ function startRace() {
 
 // Show ready button for multiplayer
 function showReadyButton() {
-  // Remove existing button if it exists
-  const existingBtn = document.getElementById("readyBtn");
-  if (existingBtn) {
-    existingBtn.remove();
+  const readyButton = document.getElementById("ready-button");
+  if (readyButton) {
+    readyButton.style.display = "block";
+
+    // Add event listener
+    const btnReady = document.getElementById("btn-ready");
+    if (btnReady) {
+      // Change button text for host
+      if (window.multiplayer && window.multiplayer.isHost) {
+        btnReady.textContent = "Start Race";
+        btnReady.classList.add("host-button");
+      } else {
+        btnReady.textContent = "Ready";
+      }
+
+      btnReady.addEventListener("click", () => {
+        if (window.multiplayer) {
+          window.multiplayer.sendReady();
+        }
+      });
+    }
   }
 
-  const readyBtn = document.createElement("button");
-  readyBtn.id = "readyBtn";
-  readyBtn.innerText = "Ready to Race!";
-  readyBtn.style.position = "absolute";
-  readyBtn.style.top = "50%";
-  readyBtn.style.left = "50%";
-  readyBtn.style.transform = "translate(-50%, -50%)";
-  readyBtn.style.padding = "20px 40px";
-  readyBtn.style.fontSize = "24px";
-  readyBtn.style.backgroundColor = "#4CAF50";
-  readyBtn.style.color = "white";
-  readyBtn.style.border = "none";
-  readyBtn.style.borderRadius = "10px";
-  readyBtn.style.cursor = "pointer";
-  readyBtn.style.zIndex = "1000";
-
-  readyBtn.addEventListener("click", () => {
-    if (window.multiplayer) {
-      window.multiplayer.setReady();
-      readyBtn.style.display = "none";
-
-      // Show waiting message
-      const waitingMsg = document.createElement("div");
-      waitingMsg.id = "waitingMessage";
-      waitingMsg.innerText = "Waiting for other players...";
-      waitingMsg.style.position = "absolute";
-      waitingMsg.style.top = "50%";
-      waitingMsg.style.left = "50%";
-      waitingMsg.style.transform = "translate(-50%, -50%)";
-      waitingMsg.style.padding = "20px";
-      waitingMsg.style.fontSize = "24px";
-      waitingMsg.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-      waitingMsg.style.color = "white";
-      waitingMsg.style.borderRadius = "10px";
-      waitingMsg.style.zIndex = "1000";
-
-      document.getElementById("gameContainer").appendChild(waitingMsg);
-    }
-  });
-
-  document.getElementById("gameContainer").appendChild(readyBtn);
+  // Show Add AI button for host
+  showAddAIButton();
 }
 
 // Show connection status
 function showConnectionStatus(status, message) {
-  // Remove existing status if it exists
-  const existingStatus = document.getElementById("connectionStatus");
-  if (existingStatus) {
-    existingStatus.remove();
-  }
-
-  const statusDiv = document.createElement("div");
-  statusDiv.id = "connectionStatus";
-  statusDiv.innerText = message;
-  statusDiv.style.position = "absolute";
-  statusDiv.style.top = "10px";
-  statusDiv.style.right = "10px";
-  statusDiv.style.padding = "10px";
-  statusDiv.style.borderRadius = "5px";
-  statusDiv.style.zIndex = "1000";
-
-  if (status === "connected") {
-    statusDiv.style.backgroundColor = "rgba(0, 128, 0, 0.7)";
-  } else if (status === "connecting") {
-    statusDiv.style.backgroundColor = "rgba(255, 165, 0, 0.7)";
-  } else {
-    statusDiv.style.backgroundColor = "rgba(255, 0, 0, 0.7)";
-  }
-
-  document.getElementById("gameContainer").appendChild(statusDiv);
-
-  // Auto-remove after 5 seconds if connected
-  if (status === "connected") {
-    setTimeout(() => {
-      statusDiv.remove();
-    }, 5000);
+  const connectionStatus = document.getElementById("connection-status");
+  if (connectionStatus) {
+    connectionStatus.textContent = message;
+    connectionStatus.className = "connection-status " + status;
   }
 }
 
-// Add a debug panel to the UI
-function addDebugPanel() {
-  const debugPanel = document.createElement("div");
-  debugPanel.id = "debugPanel";
-  debugPanel.style.position = "absolute";
-  debugPanel.style.bottom = "10px";
-  debugPanel.style.left = "10px";
-  debugPanel.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-  debugPanel.style.color = "white";
-  debugPanel.style.padding = "10px";
-  debugPanel.style.borderRadius = "5px";
-  debugPanel.style.fontFamily = "monospace";
-  debugPanel.style.fontSize = "12px";
-  debugPanel.style.maxWidth = "300px";
-  debugPanel.style.maxHeight = "200px";
-  debugPanel.style.overflow = "auto";
-  debugPanel.style.zIndex = "1000";
+// Show finish message
+function showFinishMessage() {
+  const countdownElement = document.getElementById("countdown");
+  if (!countdownElement) return;
 
-  document.getElementById("gameContainer").appendChild(debugPanel);
+  // Show finish message
+  countdownElement.textContent = "FINISH!";
+  countdownElement.style.display = "flex";
 
-  // Update debug info every 500ms
-  setInterval(updateDebugInfo, 500);
-}
-
-function updateDebugInfo() {
-  const debugPanel = document.getElementById("debugPanel");
-  if (!debugPanel) return;
-
-  let debugInfo = `
-    <strong>Controls:</strong> ${JSON.stringify(gameState.controls)}<br>
-    <strong>Speed:</strong> ${Math.round(gameState.speed)}<br>
-    <strong>Acceleration:</strong> ${gameState.acceleration.toFixed(2)}<br>
-    <strong>Gear:</strong> ${gameState.currentGear}<br>
-    <strong>RPM:</strong> ${Math.round(gameState.rpm)}<br>
-    <strong>Distance:</strong> ${gameState.distance.toFixed(2)}/${
-    gameState.finishDistance
-  }<br>
-  `;
-
-  if (gameState.isMultiplayer && window.multiplayer) {
-    debugInfo += `
-      <strong>Multiplayer:</strong> ${
-        window.multiplayer.connected ? "Connected" : "Disconnected"
-      }<br>
-      <strong>Socket ID:</strong> ${window.multiplayer.socket?.id || "N/A"}<br>
-      <strong>Game ID:</strong> ${window.multiplayer.gameId || "N/A"}<br>
-      <strong>Other Players:</strong> ${
-        Object.keys(window.multiplayer.otherPlayers).length
-      }<br>
-    `;
-  }
-
-  debugPanel.innerHTML = debugInfo;
+  // Hide after 3 seconds
+  setTimeout(() => {
+    countdownElement.style.display = "none";
+  }, 3000);
 }
 
 // Initialize UI
 function initUI() {
-  // Add distance indicator
-  addDistanceIndicator();
+  console.log("Initializing UI...");
 
-  // Set up restart button
-  const restartBtn = document.getElementById("restartBtn");
-  if (restartBtn) {
-    restartBtn.addEventListener("click", () => {
-      location.reload();
-    });
+  // Show ready button in multiplayer mode
+  if (gameState.isMultiplayer) {
+    showReadyButton();
   }
-
-  // Set up audio start button
-  const startAudioBtn = document.getElementById("startAudioBtn");
-  if (startAudioBtn) {
-    startAudioBtn.addEventListener("click", () => {
-      document.getElementById("audioStartOverlay").style.display = "none";
-
-      // Initialize audio if available
-      if (typeof initAudio === "function") {
-        initAudio();
-      }
-
-      // Start the game in single player mode
-      if (!gameState.isMultiplayer) {
-        startRace();
-      }
-    });
-  }
-
-  // Add debug panel
-  addDebugPanel();
-
-  console.log("UI initialized");
 }
 
 // Call initUI when the page loads
@@ -711,184 +622,6 @@ function updateGearIndicator() {
   }
 }
 
-// Show ready button
-function showReadyButton() {
-  // Create ready button if it doesn't exist
-  let readyButton = document.getElementById("readyButton");
-
-  if (!readyButton) {
-    readyButton = document.createElement("button");
-    readyButton.id = "readyButton";
-    readyButton.textContent = "Ready";
-    readyButton.style.position = "fixed";
-    readyButton.style.bottom = "20px";
-    readyButton.style.left = "50%";
-    readyButton.style.transform = "translateX(-50%)";
-    readyButton.style.padding = "10px 20px";
-    readyButton.style.fontSize = "18px";
-    readyButton.style.backgroundColor = "#4CAF50";
-    readyButton.style.color = "white";
-    readyButton.style.border = "none";
-    readyButton.style.borderRadius = "5px";
-    readyButton.style.cursor = "pointer";
-    readyButton.style.zIndex = "1000";
-
-    // Add hover effects
-    readyButton.onmouseover = function () {
-      this.style.backgroundColor = "#45a049";
-    };
-    readyButton.onmouseout = function () {
-      this.style.backgroundColor = "#4CAF50";
-    };
-
-    // Add click handler
-    readyButton.onclick = function () {
-      if (window.multiplayer && window.multiplayer.socket) {
-        // Send ready signal to server
-        window.multiplayer.socket.emit("playerReady");
-
-        // Update button
-        this.textContent = "Waiting for others...";
-        this.disabled = true;
-        this.style.backgroundColor = "#cccccc";
-        this.style.cursor = "default";
-
-        console.log("Player ready signal sent");
-      }
-    };
-
-    document.body.appendChild(readyButton);
-    console.log("Ready button added");
-  }
-}
-
-// Show countdown
-function showCountdown() {
-  console.log("Showing countdown");
-
-  // Create countdown element
-  const countdown = document.createElement("div");
-  countdown.id = "countdown";
-  countdown.style.position = "fixed";
-  countdown.style.top = "50%";
-  countdown.style.left = "50%";
-  countdown.style.transform = "translate(-50%, -50%)";
-  countdown.style.fontSize = "100px";
-  countdown.style.fontWeight = "bold";
-  countdown.style.color = "white";
-  countdown.style.textShadow = "0 0 10px black";
-  countdown.style.zIndex = "1000";
-  document.body.appendChild(countdown);
-
-  // Start countdown
-  let count = 3;
-  countdown.textContent = count;
-
-  const countdownInterval = setInterval(() => {
-    count--;
-
-    if (count > 0) {
-      countdown.textContent = count;
-    } else if (count === 0) {
-      countdown.textContent = "GO!";
-
-      // Start race
-      gameState.started = true;
-      gameState.raceStartTime = Date.now();
-
-      // Hide ready button
-      const readyButton = document.getElementById("readyButton");
-      if (readyButton) {
-        readyButton.style.display = "none";
-      }
-    } else {
-      // Remove countdown element
-      document.body.removeChild(countdown);
-      clearInterval(countdownInterval);
-    }
-  }, 1000);
-}
-
-// Show connection status
-function showConnectionStatus(status, message) {
-  console.log(`Connection status: ${status} - ${message}`);
-
-  // Create or update status element
-  let statusElement = document.getElementById("connection-status");
-
-  if (!statusElement) {
-    statusElement = document.createElement("div");
-    statusElement.id = "connection-status";
-    statusElement.style.position = "fixed";
-    statusElement.style.bottom = "10px";
-    statusElement.style.right = "10px";
-    statusElement.style.padding = "10px";
-    statusElement.style.borderRadius = "5px";
-    statusElement.style.fontFamily = "Arial, sans-serif";
-    statusElement.style.zIndex = "1000";
-    document.body.appendChild(statusElement);
-  }
-
-  // Set styles based on status
-  switch (status) {
-    case "connecting":
-      statusElement.style.backgroundColor = "rgba(255, 165, 0, 0.8)"; // Orange
-      break;
-    case "connected":
-      statusElement.style.backgroundColor = "rgba(0, 128, 0, 0.8)"; // Green
-      // Hide after 3 seconds
-      setTimeout(() => {
-        statusElement.style.display = "none";
-      }, 3000);
-      break;
-    case "error":
-    case "disconnected":
-      statusElement.style.backgroundColor = "rgba(255, 0, 0, 0.8)"; // Red
-      break;
-    default:
-      statusElement.style.backgroundColor = "rgba(0, 0, 0, 0.8)"; // Black
-  }
-
-  statusElement.style.color = "white";
-  statusElement.textContent = message;
-  statusElement.style.display = "block";
-}
-
-// Show finish message
-function showFinishMessage() {
-  // Create finish message element
-  const finishMessage = document.createElement("div");
-  finishMessage.id = "finish-message";
-  finishMessage.style.position = "fixed";
-  finishMessage.style.top = "50%";
-  finishMessage.style.left = "50%";
-  finishMessage.style.transform = "translate(-50%, -50%)";
-  finishMessage.style.fontSize = "60px";
-  finishMessage.style.fontWeight = "bold";
-  finishMessage.style.color = "white";
-  finishMessage.style.textShadow = "0 0 10px black";
-  finishMessage.style.zIndex = "1000";
-  finishMessage.textContent = "FINISH!";
-  document.body.appendChild(finishMessage);
-
-  // Calculate race time
-  if (gameState.raceStartTime) {
-    const raceTime = (Date.now() - gameState.raceStartTime) / 1000;
-
-    // Add race time to finish message
-    const timeElement = document.createElement("div");
-    timeElement.style.fontSize = "30px";
-    timeElement.style.marginTop = "20px";
-    timeElement.textContent = `Time: ${raceTime.toFixed(2)}s`;
-    finishMessage.appendChild(timeElement);
-  }
-
-  // Hide after 5 seconds
-  setTimeout(() => {
-    finishMessage.style.display = "none";
-  }, 5000);
-}
-
 // Export functions
 window.updateSpeedometer = updateSpeedometer;
 window.updateTachometer = updateTachometer;
@@ -898,3 +631,37 @@ window.showReadyButton = showReadyButton;
 window.showCountdown = showCountdown;
 window.showConnectionStatus = showConnectionStatus;
 window.showFinishMessage = showFinishMessage;
+
+// Add this function to create an "Add AI" button for the host
+function showAddAIButton() {
+  // Only show for host
+  if (
+    !gameState.isMultiplayer ||
+    !window.multiplayer ||
+    !window.multiplayer.isHost
+  ) {
+    return;
+  }
+
+  // Create button container if it doesn't exist
+  let addAIButton = document.getElementById("add-ai-button");
+
+  if (!addAIButton) {
+    addAIButton = document.createElement("div");
+    addAIButton.id = "add-ai-button";
+    addAIButton.style.position = "absolute";
+    addAIButton.style.bottom = "80px";
+    addAIButton.style.right = "20px";
+
+    const button = document.createElement("button");
+    button.textContent = "Add AI Car";
+    button.onclick = () => {
+      if (window.multiplayer && window.multiplayer.connection) {
+        window.multiplayer.connection.addAICars(1);
+      }
+    };
+
+    addAIButton.appendChild(button);
+    document.getElementById("ui").appendChild(addAIButton);
+  }
+}
