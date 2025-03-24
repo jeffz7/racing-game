@@ -146,11 +146,37 @@ class MultiplayerManager {
 
     // Handle new player joining
     this.socket.on("playerJoined", (data) => {
-      console.log(`Player joined: ${data.playerName}`, data);
+      console.log("Player joined:", data);
+
+      // If this player replaced an AI car, we've already handled the AI car removal
+      // Just add the new player
+      this.addRemotePlayerToScene(
+        data.playerId,
+        data.playerName,
+        data.players[data.playerId].position
+      );
+
+      // Update the player list in the UI
       this.updatePlayerList(data.players);
 
       if (typeof updateLeaderboard === "function") {
         updateLeaderboard();
+      }
+
+      // Important: Position our car at the server-assigned position
+      const myPlayerData = data.players[this.socket.id];
+      if (myPlayerData && myPlayerData.position) {
+        console.log("Setting player car position to:", myPlayerData.position);
+
+        // Set the player car position based on server data
+        playerCar.position.set(
+          myPlayerData.position.x,
+          myPlayerData.position.y,
+          myPlayerData.position.z
+        );
+
+        // Also update the camera to follow from the new position
+        updateCameraPosition();
       }
     });
 
@@ -180,6 +206,29 @@ class MultiplayerManager {
       // Update leaderboard
       if (typeof updateLeaderboard === "function") {
         updateLeaderboard();
+      }
+
+      // Update remote player position
+      if (this.otherPlayers[data.id]) {
+        const remotePlayer = this.otherPlayers[data.id];
+
+        // Update position
+        remotePlayer.car.position.set(
+          data.position.x,
+          data.position.y,
+          data.position.z
+        );
+
+        // Update rotation
+        remotePlayer.car.rotation.set(
+          data.rotation.x,
+          data.rotation.y,
+          data.rotation.z
+        );
+
+        // Store speed and distance for potential use
+        remotePlayer.speed = data.speed;
+        remotePlayer.distance = data.distance;
       }
     });
 
@@ -251,6 +300,24 @@ class MultiplayerManager {
         this.attemptReconnect();
       }
     });
+
+    // Handle AI cars being added
+    this.socket.on("aiCarsAdded", (data) => {
+      console.log("AI cars added:", data.aiCars);
+
+      // Add each AI car to the game
+      data.aiCars.forEach((aiCar) => {
+        this.addAICarToScene(aiCar);
+      });
+    });
+
+    // Handle AI car being removed (when replaced by a player)
+    this.socket.on("aiCarRemoved", (data) => {
+      console.log("AI car removed:", data.aiCarId);
+
+      // Remove the AI car from the scene
+      this.removeAICarFromScene(data.aiCarId);
+    });
   }
 
   updatePlayerList(players) {
@@ -297,10 +364,26 @@ class MultiplayerManager {
 
     const car = createCar(randomColor, playerData.name);
 
-    // Position the car at the starting position
-    // Each player gets a different starting position
-    const playerIndex = Object.keys(this.otherPlayers).length;
-    car.position.set(playerIndex * 4 - 2, 0, -40); // Start line position
+    // Position the car at the server-assigned position
+    if (playerData.position) {
+      car.position.set(
+        playerData.position.x,
+        playerData.position.y,
+        playerData.position.z
+      );
+      console.log(
+        `Positioning player ${playerData.name} at server position:`,
+        playerData.position
+      );
+    } else {
+      // Fallback to default position if server didn't provide one
+      const playerIndex = Object.keys(this.otherPlayers).length;
+      car.position.set(playerIndex * 4 - 2, 0, -40);
+      console.log(
+        `Positioning player ${playerData.name} at fallback position:`,
+        car.position
+      );
+    }
 
     // Store player data
     this.otherPlayers[id] = {
@@ -595,6 +678,82 @@ class MultiplayerManager {
 
     return this.socket.connected;
   }
+
+  addAICarToScene(aiCar) {
+    // Create a car model for the AI
+    const aiCarModel = createCarModel(aiCar.id, true); // true indicates it's an AI car
+
+    // Position the car according to the data from server
+    aiCarModel.position.set(
+      aiCar.position.x,
+      aiCar.position.y,
+      aiCar.position.z
+    );
+
+    // Add the car to the scene
+    scene.add(aiCarModel);
+
+    // Store the AI car in a collection for later reference
+    this.aiCars.push({
+      id: aiCar.id,
+      name: aiCar.name,
+      car: aiCarModel,
+      distance: aiCar.distance,
+      finished: aiCar.finished,
+    });
+  }
+
+  removeAICarFromScene(aiCarId) {
+    if (this.aiCars.find((car) => car.id === aiCarId)) {
+      // Remove the car model from the scene
+      scene.remove(this.aiCars.find((car) => car.id === aiCarId).car);
+
+      // Clean up any resources
+      if (this.aiCars.find((car) => car.id === aiCarId).car.geometry) {
+        this.aiCars.find((car) => car.id === aiCarId).car.geometry.dispose();
+      }
+
+      if (this.aiCars.find((car) => car.id === aiCarId).car.material) {
+        if (
+          Array.isArray(
+            this.aiCars.find((car) => car.id === aiCarId).car.material
+          )
+        ) {
+          this.aiCars
+            .find((car) => car.id === aiCarId)
+            .car.material.forEach((material) => material.dispose());
+        } else {
+          this.aiCars.find((car) => car.id === aiCarId).car.material.dispose();
+        }
+      }
+
+      // Remove from our collection
+      this.aiCars = this.aiCars.filter((car) => car.id !== aiCarId);
+    }
+  }
+
+  addRemotePlayerToScene(playerId, playerName, position) {
+    // Create a car model for the remote player
+    const playerCarModel = createCarModel(playerId, false); // false indicates it's not an AI car
+
+    // Position the car according to the data from server
+    playerCarModel.position.set(position.x, position.y, position.z);
+
+    // Add the car to the scene
+    scene.add(playerCarModel);
+
+    // Store the remote player in a collection for later reference
+    this.otherPlayers[playerId] = {
+      id: playerId,
+      name: playerName,
+      car: playerCarModel,
+      distance: 0,
+      finished: false,
+    };
+
+    // Add player name label above the car
+    addPlayerNameLabel(playerId, playerName, playerCarModel);
+  }
 }
 
 // Helper function to create a car for a player
@@ -754,6 +913,39 @@ function getRandomColor() {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
+// Helper function to create a car model for players or AI
+function createCarModel(id, isAI) {
+  console.log(`Creating car model for ${isAI ? "AI" : "player"}: ${id}`);
+
+  // Create a car based on whether it's AI or player
+  let car;
+
+  if (isAI) {
+    // AI cars are green
+    car = createCarForAI(`AI ${id.split("-")[1]}`);
+  } else {
+    // Player cars get random colors
+    car = createCarForPlayer(`Player ${id.substring(0, 4)}`);
+  }
+
+  // Add a property to identify this car
+  car.userData = {
+    id: id,
+    isAI: isAI,
+  };
+
+  return car;
+}
+
+// Helper function to add a player name label above a car
+function addPlayerNameLabel(playerId, playerName, carModel) {
+  const nameLabel = createTextLabel(playerName);
+  nameLabel.position.set(0, 2, 0);
+  carModel.add(nameLabel);
+
+  return nameLabel;
+}
+
 // Create global multiplayer instance
 window.multiplayer = null;
 
@@ -796,3 +988,48 @@ window.debugMultiplayer = {
     return players;
   },
 };
+
+// Show the game UI
+function showGameUI() {
+  console.log("Showing game UI");
+
+  // Show the game container
+  const gameContainer = document.getElementById("gameContainer");
+  if (gameContainer) {
+    gameContainer.style.display = "block";
+  }
+
+  // Show the HUD
+  const hud = document.getElementById("hud");
+  if (hud) {
+    hud.style.display = "block";
+  }
+
+  // Show the positions/leaderboard
+  const positions = document.getElementById("positions");
+  if (positions) {
+    positions.style.display = "block";
+  }
+}
+
+// Hide the lobby
+function hideLobby() {
+  console.log("Hiding lobby");
+
+  // Hide the lobby container
+  const lobbyContainer = document.getElementById("lobbyContainer");
+  if (lobbyContainer) {
+    lobbyContainer.style.display = "none";
+  }
+}
+
+// Update camera position based on player car
+function updateCameraPosition() {
+  if (!playerCar || !camera) return;
+
+  // Position camera behind the car
+  const cameraOffset = new THREE.Vector3(0, 5, -10);
+  cameraOffset.applyQuaternion(playerCar.quaternion);
+  camera.position.copy(playerCar.position).add(cameraOffset);
+  camera.lookAt(playerCar.position);
+}
