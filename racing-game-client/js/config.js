@@ -51,6 +51,13 @@ const config = {
   gears: {
     changeTime: 500, // Time to change gears (ms)
   },
+
+  // Race finish settings
+  finish: {
+    raceDistance: 1000, // Distance to finish line
+    decelerationDistance: 50, // Distance after finish line where cars slow down
+    stopDistance: 100, // Distance after finish line where cars stop completely
+  },
 };
 
 // Input state
@@ -77,10 +84,15 @@ let touchControls = {
 //   aiCars = [],
 //   track;
 
+// Define global constants for easier access
+const RACE_DISTANCE = config.finish.raceDistance;
+const FINISH_DECELERATION_DISTANCE = config.finish.decelerationDistance;
+const FINISH_STOP_DISTANCE = config.finish.stopDistance;
+
 // Any configuration functions can now use the global gameState
 function initializeGameConfig() {
   // You can still set specific config values here if needed
-  gameState.finishDistance = 1000; // meters to finish line
+  gameState.finishDistance = config.finish.raceDistance; // meters to finish line
 
   // Other configuration...
 }

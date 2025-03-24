@@ -187,6 +187,106 @@ function updateCarPhysics(deltaTime) {
   // Calculate RPM based on speed and gear
   updateRPM();
 
+  // Check if we've crossed the finish line
+  if (!gameState.finishCrossed && gameState.distance >= 1000) {
+    console.log("Player crossed finish line!");
+    gameState.finishCrossed = true;
+
+    // Trigger finish line effects
+    triggerFinishLineEffects();
+
+    // Send finish event to server in multiplayer mode
+    if (gameState.isMultiplayer && window.multiplayer) {
+      window.multiplayer.socket.emit("updatePosition", {
+        position: {
+          x: playerCar.position.x,
+          y: playerCar.position.y,
+          z: playerCar.position.z,
+        },
+        rotation: {
+          x: playerCar.rotation.x,
+          y: playerCar.rotation.y,
+          z: playerCar.rotation.z,
+        },
+        speed: gameState.speed,
+        distance: gameState.distance,
+        finished: false, // Not fully finished yet
+      });
+    }
+
+    // Show finish notification
+    showFinishNotification();
+  }
+
+  // Improve the finish line deceleration logic
+  // Apply finish line deceleration if we've crossed the finish line
+  if (gameState.finishCrossed && !gameState.finished) {
+    // Calculate how far past the finish line we are
+    const distancePastFinish = gameState.distance - gameState.finishDistance;
+
+    // Get deceleration and stop distances from config
+    const decelerationDistance = config.finish.decelerationDistance;
+    const stopDistance = config.finish.stopDistance;
+
+    // Apply gradual deceleration based on distance past finish line
+    if (distancePastFinish < decelerationDistance) {
+      // Gradually reduce throttle input
+      const decelerationFactor = 1 - distancePastFinish / decelerationDistance;
+      gameState.throttle *= decelerationFactor;
+
+      // Apply some braking (stronger than before)
+      gameState.brakeForce = 0.5;
+
+      // Limit maximum speed
+      const maxSpeedFactor = 1 - distancePastFinish / decelerationDistance;
+      if (gameState.speed > maxSpeedFactor * config.carSpeed) {
+        gameState.speed = maxSpeedFactor * config.carSpeed;
+      }
+    } else {
+      // Past deceleration zone, apply full braking to stop
+      gameState.throttle = 0;
+      gameState.brakeForce = 1.0;
+
+      // Force stronger deceleration
+      gameState.speed *= 0.95;
+
+      // Check if we've stopped or reached the barrier
+      if (
+        Math.abs(gameState.speed) < 0.01 ||
+        distancePastFinish >= stopDistance
+      ) {
+        gameState.speed = 0;
+        gameState.finished = true;
+        console.log(
+          "Player fully stopped after finish line at distance:",
+          gameState.distance
+        );
+
+        // Send final position to server in multiplayer mode
+        if (gameState.isMultiplayer && window.multiplayer) {
+          window.multiplayer.socket.emit("updatePosition", {
+            position: {
+              x: playerCar.position.x,
+              y: playerCar.position.y,
+              z: playerCar.position.z,
+            },
+            rotation: {
+              x: playerCar.rotation.x,
+              y: playerCar.rotation.y,
+              z: playerCar.rotation.z,
+            },
+            speed: 0,
+            distance: gameState.distance,
+            finished: true, // Now fully finished
+          });
+        }
+
+        // Show finish results
+        showFinishResults();
+      }
+    }
+  }
+
   // Debug output (less frequent to avoid console spam)
   if (Math.random() < 0.05) {
     console.log(
@@ -315,6 +415,70 @@ function shiftGearDown() {
 
       console.log(`Shifted down to gear ${gameState.currentGear}`);
     }, 200);
+  }
+}
+
+// Add this function to trigger finish line effects
+function triggerFinishLineEffects() {
+  console.log("Triggering finish line effects");
+
+  // Show confetti
+  if (window.finishConfetti) {
+    window.finishConfetti.visible = true;
+
+    // Hide confetti after 10 seconds
+    setTimeout(() => {
+      if (window.finishConfetti) {
+        window.finishConfetti.visible = false;
+      }
+    }, 10000);
+  }
+
+  // Play finish sound
+  if (
+    window.audioManager &&
+    typeof window.audioManager.playSound === "function"
+  ) {
+    window.audioManager.playSound("finish");
+  } else {
+    // Fallback if audio manager not available
+    console.log("Audio manager not available for finish sound");
+  }
+
+  // Add camera shake effect
+  if (window.camera) {
+    const originalPosition = {
+      x: window.camera.position.x,
+      y: window.camera.position.y,
+      z: window.camera.position.z,
+    };
+
+    // Simple camera shake
+    let shakeTime = 0;
+    const shakeInterval = setInterval(() => {
+      if (shakeTime >= 1000) {
+        clearInterval(shakeInterval);
+        // Reset camera position
+        if (window.camera) {
+          window.camera.position.set(
+            originalPosition.x,
+            originalPosition.y,
+            originalPosition.z
+          );
+        }
+        return;
+      }
+
+      // Apply random offset
+      if (window.camera) {
+        window.camera.position.x =
+          originalPosition.x + (Math.random() - 0.5) * 0.5;
+        window.camera.position.y =
+          originalPosition.y + (Math.random() - 0.5) * 0.5;
+      }
+
+      shakeTime += 50;
+    }, 50);
   }
 }
 

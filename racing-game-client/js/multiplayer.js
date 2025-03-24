@@ -318,6 +318,34 @@ class MultiplayerManager {
       // Remove the AI car from the scene
       this.removeAICarFromScene(data.aiCarId);
     });
+
+    // Handle player finished event
+    this.socket.on("playerFinished", (data) => {
+      console.log("Player finished:", data);
+
+      // Update other player's finished status if it's not us
+      if (data.id !== this.socket.id && this.otherPlayers[data.id]) {
+        this.otherPlayers[data.id].finished = true;
+
+        // Show notification about other player finishing
+        this.showPlayerFinishedNotification(data);
+      }
+
+      // Update leaderboard
+      if (typeof updateLeaderboard === "function") {
+        updateLeaderboard();
+      }
+    });
+
+    // Handle race finished event (all players finished)
+    this.socket.on("raceFinished", (data) => {
+      console.log("Race finished:", data);
+
+      // Only show final results if we've also finished
+      if (gameState.finished) {
+        this.showFinalResults(data.finishOrder);
+      }
+    });
   }
 
   updatePlayerList(players) {
@@ -753,6 +781,59 @@ class MultiplayerManager {
 
     // Add player name label above the car
     addPlayerNameLabel(playerId, playerName, playerCarModel);
+  }
+
+  updatePlayerStatus(id, status) {
+    if (this.otherPlayers[id]) {
+      this.otherPlayers[id].finished = status.finished || false;
+      this.otherPlayers[id].finishCrossed = status.finishCrossed || false;
+
+      // Update leaderboard
+      if (typeof updateLeaderboard === "function") {
+        updateLeaderboard();
+      }
+    }
+  }
+
+  showPlayerFinishedNotification(data) {
+    // Create a small notification for other players finishing
+    const notification = document.createElement("div");
+    notification.style.position = "absolute";
+    notification.style.bottom = "20px";
+    notification.style.right = "20px";
+    notification.style.background = "rgba(0, 0, 0, 0.7)";
+    notification.style.color = "white";
+    notification.style.padding = "10px 15px";
+    notification.style.borderRadius = "5px";
+    notification.style.zIndex = "1000";
+    notification.style.animation = "slideIn 4s forwards";
+
+    notification.textContent = `${data.name} finished in position ${data.position}!`;
+
+    // Add CSS animation
+    const style = document.createElement("style");
+    style.textContent = `
+      @keyframes slideIn {
+        0% { transform: translateX(100%); opacity: 0; }
+        10% { transform: translateX(0); opacity: 1; }
+        90% { transform: translateX(0); opacity: 1; }
+        100% { transform: translateX(100%); opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Add to document
+    document.body.appendChild(notification);
+
+    // Remove after animation completes
+    setTimeout(() => {
+      document.body.removeChild(notification);
+    }, 4000);
+  }
+
+  showFinalResults(finishOrder) {
+    // Implement the logic to show final results
+    console.log("Showing final results:", finishOrder);
   }
 }
 

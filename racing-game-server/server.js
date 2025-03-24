@@ -25,6 +25,9 @@ const players = {};
 const MAX_CARS = 5;
 const AI_UPDATE_INTERVAL = 100; // ms
 const RACE_DISTANCE = 1000; // Distance to finish line
+const FINISH_DECELERATION_DISTANCE = 50; // Distance after finish line where cars slow down
+const FINISH_STOP_DISTANCE = 100; // Distance after finish line where cars stop completely
+const AI_MAX_SPEED = 0.8; // Maximum speed for AI cars (0.0 to 1.0)
 
 // Add this near the top with other declarations
 const DEBUG = true;
@@ -140,105 +143,87 @@ function updateAICars(gameId) {
   const game = games[gameId];
   if (!game || !game.aiCars || game.status !== "racing") return;
 
-  // Occasional debug log to avoid flooding
-  if (Math.random() < 0.01) {
-    debugLog(`Updating ${game.aiCars.length} AI cars in game ${gameId}`);
-  }
-
   // Update each AI car
   game.aiCars.forEach((aiCar) => {
+    // Skip if already finished
     if (aiCar.finished) return;
 
-    // Simple AI movement logic
-    moveAICar(aiCar);
+    // Calculate new position based on simple AI logic
+    const currentTime = Date.now();
+    const elapsedTime = (currentTime - game.startTime) / 1000; // seconds
 
-    // Check for finish line crossing
-    checkAIFinishLine(gameId, aiCar);
+    // Simple AI speed calculation (can be made more sophisticated)
+    let targetSpeed;
 
-    // Broadcast AI car position to all players
-    io.to(gameId).emit("aiCarMoved", {
+    if (aiCar.distance >= RACE_DISTANCE + FINISH_STOP_DISTANCE) {
+      // AI has completely finished, stop moving
+      targetSpeed = 0;
+      aiCar.finished = true;
+    } else if (aiCar.distance >= RACE_DISTANCE) {
+      // AI crossed finish line, start slowing down
+      const slowDownFactor =
+        1 -
+        Math.min(
+          1,
+          (aiCar.distance - RACE_DISTANCE) / FINISH_DECELERATION_DISTANCE
+        );
+      targetSpeed = AI_MAX_SPEED * slowDownFactor;
+
+      // Mark as crossed finish line if not already
+      if (!aiCar.finishCrossed) {
+        aiCar.finishCrossed = true;
+
+        // Add to finish order
+        const finishTime = currentTime - game.startTime;
+        game.finishOrder.push({
+          id: aiCar.id,
+          name: aiCar.name,
+          time: finishTime,
+          isAI: true,
+        });
+
+        // Notify all players about AI finish
+        io.to(gameId).emit("playerFinished", {
+          id: aiCar.id,
+          name: aiCar.name,
+          position: game.finishOrder.length,
+          time: finishTime,
+          isAI: true,
+        });
+      }
+    } else {
+      // Normal racing speed with some randomness
+      const skillFactor = 0.8 + Math.random() * 0.4; // 80% to 120% of max speed
+      targetSpeed = AI_MAX_SPEED * skillFactor;
+    }
+
+    // Smooth acceleration/deceleration
+    aiCar.speed = aiCar.speed * 0.95 + targetSpeed * 0.05;
+
+    // Update distance based on speed
+    const distanceDelta = (aiCar.speed * AI_UPDATE_INTERVAL) / 1000;
+    aiCar.distance += distanceDelta;
+
+    // Update position (simplified straight-line movement)
+    aiCar.position.z -= distanceDelta; // Move forward (negative Z is forward)
+
+    // Broadcast AI car position to all players in the game
+    io.to(gameId).emit("aiCarPosition", {
       id: aiCar.id,
       position: aiCar.position,
       rotation: aiCar.rotation,
       speed: aiCar.speed,
+      distance: aiCar.distance,
+      finishCrossed: aiCar.finishCrossed,
+      finished: aiCar.finished,
     });
   });
-}
 
-// Simple AI movement function
-function moveAICar(aiCar) {
-  // Simple forward movement
-  aiCar.position.z += aiCar.speed * 0.1;
-
-  // Update distance traveled
-  aiCar.distance += aiCar.speed * 0.1;
-
-  // Gradually increase speed with some randomness
-  if (aiCar.speed < 60) {
-    aiCar.speed += 0.2 + Math.random() * 0.3;
-  }
-
-  // Add some lane changes occasionally
-  if (Math.random() < 0.01) {
-    aiCar.position.x += (Math.random() - 0.5) * 2;
-  }
-}
-
-// Check if AI car crossed the finish line
-function checkAIFinishLine(gameId, aiCar) {
-  if (aiCar.distance >= RACE_DISTANCE && !aiCar.finished) {
-    aiCar.finished = true;
-    const game = games[gameId];
-
-    debugLog(
-      `AI car ${aiCar.id} (${aiCar.name}) finished race in game ${gameId}`
-    );
-
-    game.finishOrder.push({
-      id: aiCar.id,
-      name: aiCar.name,
-      time: Date.now() - game.startTime,
-      isAI: true,
-    });
-
-    io.to(gameId).emit("aiCarFinished", {
-      id: aiCar.id,
-      name: aiCar.name,
-      position: game.finishOrder.length,
-      time: Date.now() - game.startTime,
-    });
-
-    // Check if race is complete (all players and AI cars finished)
+  // Check if all AI cars have finished
+  const allAIFinished = game.aiCars.every((aiCar) => aiCar.finished);
+  if (allAIFinished) {
+    debugLog(`All AI cars have finished in game ${gameId}`);
     checkRaceComplete(gameId);
-  }
-}
-
-// Check if race is complete
-function checkRaceComplete(gameId) {
-  const game = games[gameId];
-  if (!game) return;
-
-  // Count total participants
-  const totalParticipants =
-    Object.keys(game.players).length + (game.aiCars ? game.aiCars.length : 0);
-
-  debugLog(
-    `Game ${gameId}: ${game.finishOrder.length}/${totalParticipants} participants finished`
-  );
-
-  // If everyone has finished, end the race
-  if (game.finishOrder.length >= totalParticipants) {
-    debugLog(`Race complete in game ${gameId}, all participants finished`);
-    game.status = "finished";
-    io.to(gameId).emit("raceFinished", {
-      finishOrder: game.finishOrder,
-    });
-
-    // Clear AI update interval
-    if (game.aiUpdateInterval) {
-      clearInterval(game.aiUpdateInterval);
-      debugLog(`Cleared AI update interval for game ${gameId}`);
-    }
   }
 }
 
@@ -414,6 +399,59 @@ io.on("connection", (socket) => {
         );
       }
 
+      // Check if player crossed finish line
+      if (
+        data.distance >= RACE_DISTANCE &&
+        !games[gameId].players[socket.id].finishCrossed
+      ) {
+        debugLog(
+          `Player ${
+            socket.id
+          } crossed finish line at distance ${data.distance.toFixed(2)}`
+        );
+
+        // Mark that player crossed the finish line
+        games[gameId].players[socket.id].finishCrossed = true;
+
+        // Calculate finish time
+        const finishTime = Date.now() - games[gameId].startTime;
+
+        // Add to finish order if not already there
+        if (!games[gameId].players[socket.id].finished) {
+          games[gameId].finishOrder.push({
+            id: socket.id,
+            name: games[gameId].players[socket.id].name,
+            time: finishTime,
+          });
+
+          // Notify all players about this player's finish
+          io.to(gameId).emit("playerFinished", {
+            id: socket.id,
+            name: games[gameId].players[socket.id].name,
+            position: games[gameId].finishOrder.length,
+            time: finishTime,
+          });
+        }
+      }
+
+      // Check if player has completely finished (stopped after finish line)
+      if (
+        data.distance >= RACE_DISTANCE + FINISH_STOP_DISTANCE &&
+        !games[gameId].players[socket.id].finished
+      ) {
+        debugLog(
+          `Player ${
+            socket.id
+          } completely finished at distance ${data.distance.toFixed(2)}`
+        );
+
+        // Mark player as fully finished
+        games[gameId].players[socket.id].finished = true;
+
+        // Check if all players have finished
+        checkRaceComplete(gameId);
+      }
+
       // Broadcast to other players
       socket.to(gameId).emit("playerPosition", {
         id: socket.id,
@@ -421,19 +459,9 @@ io.on("connection", (socket) => {
         rotation: data.rotation,
         speed: data.speed,
         distance: data.distance,
+        finishCrossed: games[gameId].players[socket.id].finishCrossed,
+        finished: games[gameId].players[socket.id].finished,
       });
-
-      // Check if player finished
-      if (
-        data.finished &&
-        !games[gameId].players[socket.id].finished &&
-        games[gameId].status === "racing"
-      ) {
-        debugLog(
-          `Player ${socket.id} reported finish, handling race completion`
-        );
-        handlePlayerFinish(socket.id, gameId);
-      }
     }
   });
 

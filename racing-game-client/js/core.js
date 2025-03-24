@@ -125,6 +125,11 @@ function update(deltaTime) {
   updateTachometer();
   updateGearIndicator();
   updateLeaderboard();
+
+  // Update animated objects
+  if (typeof updateAnimatedObjects === "function") {
+    updateAnimatedObjects(deltaTime);
+  }
 }
 
 // Finish race

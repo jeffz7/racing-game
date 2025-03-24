@@ -889,6 +889,200 @@ function showFinishMessage() {
   }, 5000);
 }
 
+// Show finish notification
+function showFinishNotification() {
+  // Create finish notification overlay
+  const overlay = document.createElement("div");
+  overlay.id = "finishNotification";
+  overlay.style.position = "absolute";
+  overlay.style.top = "30%";
+  overlay.style.left = "50%";
+  overlay.style.transform = "translate(-50%, -50%)";
+  overlay.style.background = "rgba(0, 0, 0, 0.7)";
+  overlay.style.color = "white";
+  overlay.style.padding = "20px";
+  overlay.style.borderRadius = "10px";
+  overlay.style.textAlign = "center";
+  overlay.style.zIndex = "1000";
+  overlay.style.animation = "fadeInOut 3s forwards";
+
+  // Add finish message
+  const message = document.createElement("h2");
+  message.textContent = "Finish Line Crossed!";
+  message.style.color = "#ffcc00";
+  overlay.appendChild(message);
+
+  // Add position info if in multiplayer
+  if (gameState.isMultiplayer && window.multiplayer) {
+    const position = document.createElement("p");
+    position.textContent = "Slowing down...";
+    position.style.fontSize = "18px";
+    overlay.appendChild(position);
+  }
+
+  // Add CSS animation
+  const style = document.createElement("style");
+  style.textContent = `
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translate(-50%, -60%); }
+      20% { opacity: 1; transform: translate(-50%, -50%); }
+      80% { opacity: 1; transform: translate(-50%, -50%); }
+      100% { opacity: 0; transform: translate(-50%, -40%); }
+    }
+  `;
+  document.head.appendChild(style);
+
+  // Add to document
+  document.body.appendChild(overlay);
+
+  // Remove after animation completes
+  setTimeout(() => {
+    document.body.removeChild(overlay);
+  }, 3000);
+}
+
+// Show final results leaderboard
+function showFinalResults(finishOrder) {
+  // Create results overlay
+  const overlay = document.createElement("div");
+  overlay.id = "finalResults";
+  overlay.style.position = "absolute";
+  overlay.style.top = "50%";
+  overlay.style.left = "50%";
+  overlay.style.transform = "translate(-50%, -50%)";
+  overlay.style.background = "rgba(0, 0, 0, 0.85)";
+  overlay.style.color = "white";
+  overlay.style.padding = "30px";
+  overlay.style.borderRadius = "15px";
+  overlay.style.textAlign = "center";
+  overlay.style.zIndex = "1000";
+  overlay.style.minWidth = "400px";
+  overlay.style.maxHeight = "80vh";
+  overlay.style.overflowY = "auto";
+
+  // Add title
+  const title = document.createElement("h1");
+  title.textContent = "Race Results";
+  title.style.color = "#ffcc00";
+  title.style.marginBottom = "20px";
+  overlay.appendChild(title);
+
+  // Add results table
+  const table = document.createElement("table");
+  table.style.width = "100%";
+  table.style.borderCollapse = "collapse";
+  table.style.marginBottom = "20px";
+
+  // Add table header
+  const thead = document.createElement("thead");
+  const headerRow = document.createElement("tr");
+
+  const headers = ["Position", "Player", "Time"];
+  headers.forEach((headerText) => {
+    const th = document.createElement("th");
+    th.textContent = headerText;
+    th.style.padding = "10px";
+    th.style.borderBottom = "2px solid #ffcc00";
+    headerRow.appendChild(th);
+  });
+
+  thead.appendChild(headerRow);
+  table.appendChild(thead);
+
+  // Add table body
+  const tbody = document.createElement("tbody");
+
+  finishOrder.forEach((player, index) => {
+    const row = document.createElement("tr");
+
+    // Position cell
+    const posCell = document.createElement("td");
+    posCell.textContent = `${index + 1}${getOrdinalSuffix(index + 1)}`;
+    posCell.style.padding = "10px";
+    posCell.style.borderBottom = "1px solid #444";
+    row.appendChild(posCell);
+
+    // Player name cell
+    const nameCell = document.createElement("td");
+    nameCell.textContent = player.name;
+    nameCell.style.padding = "10px";
+    nameCell.style.borderBottom = "1px solid #444";
+
+    // Highlight local player
+    if (gameState.isMultiplayer && player.id === window.multiplayer.socket.id) {
+      nameCell.style.color = "#00ffff";
+      nameCell.style.fontWeight = "bold";
+    } else if (player.isAI) {
+      nameCell.style.color = "#aaaaaa";
+      nameCell.textContent += " (AI)";
+    }
+
+    row.appendChild(nameCell);
+
+    // Time cell
+    const timeCell = document.createElement("td");
+    timeCell.textContent = formatTime(player.time);
+    timeCell.style.padding = "10px";
+    timeCell.style.borderBottom = "1px solid #444";
+    row.appendChild(timeCell);
+
+    tbody.appendChild(row);
+  });
+
+  table.appendChild(tbody);
+  overlay.appendChild(table);
+
+  // Add back to lobby button
+  const backButton = document.createElement("button");
+  backButton.textContent = "Back to Lobby";
+  backButton.style.padding = "10px 20px";
+  backButton.style.background = "#ffcc00";
+  backButton.style.color = "black";
+  backButton.style.border = "none";
+  backButton.style.borderRadius = "5px";
+  backButton.style.cursor = "pointer";
+  backButton.style.fontSize = "16px";
+  backButton.style.marginTop = "10px";
+
+  backButton.addEventListener("click", () => {
+    // Navigate back to lobby
+    window.location.href = "lobby.html";
+  });
+
+  overlay.appendChild(backButton);
+
+  // Add to document
+  document.body.appendChild(overlay);
+}
+
+// Get ordinal suffix for numbers (1st, 2nd, 3rd, etc.)
+function getOrdinalSuffix(num) {
+  const j = num % 10;
+  const k = num % 100;
+  if (j === 1 && k !== 11) {
+    return "st";
+  }
+  if (j === 2 && k !== 12) {
+    return "nd";
+  }
+  if (j === 3 && k !== 13) {
+    return "rd";
+  }
+  return "th";
+}
+
+// Format time in mm:ss.ms format
+function formatTime(timeMs) {
+  const totalSeconds = timeMs / 1000;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const ms = Math.floor((totalSeconds % 1) * 1000);
+
+  return `${minutes.toString().padStart(2, "0")}:${seconds
+    .toString()
+    .padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
+}
+
 // Export functions
 window.updateSpeedometer = updateSpeedometer;
 window.updateTachometer = updateTachometer;
@@ -898,3 +1092,5 @@ window.showReadyButton = showReadyButton;
 window.showCountdown = showCountdown;
 window.showConnectionStatus = showConnectionStatus;
 window.showFinishMessage = showFinishMessage;
+window.showFinishNotification = showFinishNotification;
+window.showFinalResults = showFinalResults;
